@@ -1,4 +1,84 @@
 # wear_modelling
-Wrap around Fric2d and GROW to model
 
-To Do
+Geomechanical boundary element modelling of the behavor of 2 dimensional profiles in subsect to stresses. The model is built to assess the behavior of faults and, specifically, the failure  of geometrical asperities on slip surfaces. Matlab sripts develloped to work with Fric2d and GROW projects develloped by Michele Cooke and Jess McBeth. Fric2d computes tractions and displacement along the fault profile. GROW computes the propagations of cracks by incrementally adding fault elements so as to minimize work. The matlab script was built to provive simple input structures, runs scripts and extract output information, assess the tendency and spatial locale for failure and graphically display all the information.
+
+## Getting Started
+
+TO DO
+
+### Prerequisites
+
+Matlab (https://www.mathworks.com/)
+Perl
+
+### Installing
+
+A step by step series of examples that tell you have to get a development env running
+
+Say what the step will be
+
+```
+Give the example
+```
+
+And repeat
+
+```
+until finished
+```
+
+End with an example of getting some data out of the system or using it for a little demo
+
+## Running the tests
+
+Explain how to run the automated tests for this system
+
+### Break down into end to end tests
+
+Explain what these tests test and why
+
+```
+Give an example
+```
+
+### And coding style tests
+
+Explain what these tests test and why
+
+```
+Give an example
+```
+
+## Deployment
+
+Add additional notes about how to deploy this on a live system
+
+## Built With
+
+* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
+* [Maven](https://maven.apache.org/) - Dependency Management
+* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
+
+## Contributing
+
+Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+
+## Authors
+
+* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
+
+See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+
+## Acknowledgments
+
+* Hat tip to anyone who's code was used
+* Inspiration
+* etc
