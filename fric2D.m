@@ -1034,11 +1034,24 @@ function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
 
 % check if this function should be run:
 if strcmp(inputParameters.user.runGROWModel, 'yes')
+    if strcmp(inputParameters.user.runGROWModel, 'no')
+        disp('No GROW Model was lauched, change ''inputParameters.user.runGROWModel'' input to ''yes'' if so desired')
+    else 
+        error('inputParameters.user.runGROWModel in input section must be ''yes'' or ''no''')
+    end
+    return
+end
         
 outputFileName = [fileName,'.out'];
 
 % load in block of data (TERRIBLE IDEA BUT FUCK IT): 
-expectedDataBlocks = 9; % this is here to make sure that I'm not fucking up the parsing of the output
+
+% determine howmany cracks where grown
+crackLocDim = size(crackLoc);
+numCracks = crackLocDim(1);
+blocksPerCrack = 2; % make sure this is correct
+expectedFric2dDataBlocks = 9; % this is here to make sure that I'm not fucking up the parsing of the output
+expectedDataBlocks = expectedFric2dDataBlocks + blocksPerCrack*numCrack;
 
 dataBlocks = read_blocks_of_numerical_data(outputFileName, 1000);
 numBlocks  = length(dataBlocks);
@@ -1047,22 +1060,25 @@ if numBlocks ~= expectedDataBlocks
     error('the GROW output is not of the expected size consider double-checking output parsing')
 end
 
-% Get crack geometry
+% Get crack info:
+
+for iCrack = 1:numCrack
+   % exctract data for each crack
+   
+   % steps:
+% define headers (what will they be?)
+
+% get block of data
+% get the geometry
 
 % What I need to do here:
 % figure out how many blocks of data will be produced from GROW
 
 % for now the key blocks of data that I want are the crack geometry
 % need to know what the header sections will be as well
+end % for iCrack = 1:numCrack
 
-
-elseif strcmp(inputParameters.user.runGROWModel, 'no')
-        disp('No GROW Model was lauched, change ''inputParameters.user.runGROWModel'' input to ''yes'' if so desired')
-else 
-    error('inputParameters.user.runGROWModel in input section must be ''yes'' or ''no''')
-end
-
-end
+end % function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
 
 
 
