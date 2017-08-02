@@ -50,7 +50,7 @@ function [] = fric2D(fileName,X,Y)
 
 %% input parameters:
 % -----------------------------------------------------------------------
-inputParameters  = userInput();
+[inputParameters, GROWInputParameters]  = userInput();
 % -----------------------------------------------------------------------
 
 %% work flow:
@@ -79,7 +79,7 @@ crackLocations = choosecracks(shearFailureCoord  , tensileFailureCoord  , ...
                               inputParameters.user.cracks2grow, inputParameters);
 
 % 5b) run GROW with the chosen ckracks
-growOutputFile = runGROW(fileName, crackLocations, meanSegmentLength, inputParameters);    
+runGROW(fileName, crackLocations, meanSegmentLength, inputParameters, GROWInputParameters);    
 
 %% 6) extract GROW output (not finished)
 % GROWOutputStruct = extractGROWoutput(growOutputFile, crackLocations);
@@ -279,39 +279,80 @@ end
 %% ------------------- User Input --------------------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function inputParameters = userInput()
+function [inputParameters, GROWInputParameters] = userInput()
     inputParameters = [];
 
     % material parameters:
 
-    inputParameters.material.E                      = 30000;     % Young's Modulus MPa
+    inputParameters.material.E                     = 30000;     % Young's Modulus MPa
     inputParameters.material.nu                    = 0.25;      % Poisson's ratio
 
-    inputParameters.material.c                      = 5;         % cohesion (MPa)
+    inputParameters.material.c                     = 5;         % cohesion (MPa)
     inputParameters.material.phi                   = 20;        % angle of intenral friction  (degrees)
 
     % boundary conditions
 
-    inputParameters.boundaryConditions.sigxx       = -100;       % normal stress parallel to faults MPa
-    inputParameters.boundaryConditions.sigyy        = -100;       % normal stress perpendicular to faults MPa
+    inputParameters.boundaryConditions.sigxx       = 100;       % normal stress parallel to faults MPa
+    inputParameters.boundaryConditions.sigyy       = 100;       % normal stress perpendicular to faults MPa
     inputParameters.boundaryConditions.shear       = 40;        % shear stress on faults  MPa
 
     % end bits
-    inputParameters.boundaryConditions.BVSTop       = -0.0000445;  % displacement on left end bit (m)
-    inputParameters.boundaryConditions.BVSBot       = -0.000215;   % displacement on right end bit (m) 
+    inputParameters.boundaryConditions.BVSTop      = -0.0000445;  % displacement on left end bit (m)
+    inputParameters.boundaryConditions.BVSBot      = -0.000215;   % displacement on right end bit (m) 
 
     % user choices
 
-    inputParameters.user.showFric2DOutput           = 'yes';     % plot output from fric2d ('yes' or 'no')
-    inputParameters.user.cracks2grow                = 'max coulomb';     % 'all':           all the coordinates specified in input (tensile+shear)
+    inputParameters.user.showFric2DOutput          = 'yes';     % plot output from fric2d ('yes' or 'no')
+    inputParameters.user.cracks2grow               = 'max coulomb';     % 'all':           all the coordinates specified in input (tensile+shear)
                                                                  % 'tensile':       only cracks that failed in tensile stress (listed in
                                                                  %                  tensileFailureCoord)
                                                                  % 'shear'          only cracks that failed in shear stress (listed in
                                                                  %                  shearFailureCoord)
                                                                  % 'max tensile'    most tensile crack
                                                                  % 'max coulomb'      most sheared crack                                                            
-    inputParameters.user.runGROWModel               = 'yes' ;     % run grow ('yes' or 'no')
-    % GROW inputs are all in the runGROW function
+    inputParameters.user.runGROWModel              = 'yes' ;     % run grow ('yes' or 'no')
+    
+    
+    % GROW inputs
+    
+    GROWInputParameters = [];
+    
+    GROWInputParameters.growFileName = 'grow_specs.in';
+    
+    % grow input  parameters parameter
+    
+    % this will be part of the command to run GROW
+    GROWInputParameters.angleResolution         = 45;
+    GROWInputParameters.startAngle              = 45;
+    GROWInputParameters.endAngle                = 315;
+    
+    % parameters tacked on to input file
+    fault_flaw              = [];
+    fault_flaw.tag          = 'Flaw-Fault'; % tag
+    fault_flaw.stiffS       = 10^10;        % shear stiffness
+    fault_flaw.stiffN       = 10^10;        % normal stiffness
+    fault_flaw.cohes        = 0;            % sliding cohesion
+    fault_flaw.friction_s   = 0.6;          % static friction
+    fault_flaw.friction_d   = 0.0;          % dynamic friction
+    fault_flaw.L            = 10^-5;        % critical sliding distance
+    
+    
+    intact_flaw             = [];
+    intact_flaw.Tag         = 'Flaw-intact';
+    intact_flaw.fault       = 'crittical_point';    
+    intact_flaw.grow_both   = 'yes';
+    intact_flaw.stiffS      = 0;
+    intact_flaw.stiffN      = 10^10;
+    intact_flaw.T           = 5;
+    intact_flaw.S_0         = 50;
+    intact_flaw.cohesion    = 0;
+    intact_flaw.friction_s  = 0.6;
+    intact_flaw.friction_d  = 0.0;
+    intact_flaw.L           = 10^-5;
+    
+    GROWInputParameters.fault_flaw = fault_flaw;
+    GROWInputParameters.intact_flaw = intact_flaw;
+    
 end
 
 
@@ -713,9 +754,12 @@ for iBE = 1:numBE
     
     tensor      =  [sigma11(iBE), sigma12(iBE); ...
                     sigma12(iBE), sigma22(iBE)];
+                            
     eigenValues = eig(tensor);
-    sigma1      = eigenValues(1);
-    sigma3      = eigenValues(2);
+    
+    % DOING GEOLOGY FOR A MOMENT HERE
+    sigma1      = -eigenValues(2);
+    sigma3      = -eigenValues(1);
     
     tau_m       = (sigma1-sigma3)/2;
     sigma_m     = (sigma1+sigma3)/2;
@@ -736,11 +780,8 @@ tempTC(tempTC<0) = 0;
 [~,shearFailureInd  ] = findpeaks(tempCC,'SortStr', 'descend'); % find peak stresses and sort their indices
 [~,tensileFailureInd] = findpeaks(tempTC,'SortStr', 'descend');
 
-shearFailureCoord     =  [X(shearFailureInd+1), ... 
-                                        Y(shearFailureInd+1)];
-                               
-tensileFailureCoord   =  [X(tensileFailureInd+1), ...
-                                       Y(tensileFailureInd+1)];                     
+shearFailureCoord     =  [X(shearFailureInd+1), Y(shearFailureInd+1)];                           
+tensileFailureCoord   =  [X(tensileFailureInd+1), Y(tensileFailureInd+1)];                     
                      
 end
 
@@ -775,35 +816,34 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
 
-if      strcmp(userChoice, 'all')
-    CRACKLOCATION = [shearFailureCoord;tensileFailureCoord];
-    warning('Running all crack locations may be computationally expensive')
-    if isempty(CRACKLOCATION)
-        error('There are no points that will fail in shear or in tension')
-    end
-elseif  strcmp(userChoice, 'tensile')
-    CRACKLOCATION = tensileFailureCoord;
-elseif  strcmp(userChoice, 'max tensile')
-    CRACKLOCATION = tensileFailureCoord(1,:); % max is the first location because the list is sorted
-    
-elseif  strcmp(userChoice, 'shear')
-    CRACKLOCATION = shearFailureCoord;
-    
-elseif  strcmp(userChoice, 'max coulomb')
-    CRACKLOCATION = shearFailureCoord(1,:); % max is the first location because the list is sorted
-else
-    error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
+CRACKLOCATION = [];
+if      strcmp(userChoice, 'all');          try CRACKLOCATION = [shearFailureCoord;tensileFailureCoord]; end 
+elseif  strcmp(userChoice, 'tensile');      try CRACKLOCATION = tensileFailureCoord; end
+elseif  strcmp(userChoice, 'max tensile');  try CRACKLOCATION = tensileFailureCoord(1,:); end % max is the first location because the list is sorted   
+elseif  strcmp(userChoice, 'shear');        try CRACKLOCATION = shearFailureCoord; end  
+elseif  strcmp(userChoice, 'max coulomb');  try CRACKLOCATION = shearFailureCoord(1,:); end % max is the first location because the list is sorted
+else;                                       error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
 end
 
+if isempty(CRACKLOCATION)
+    error('No cracks will fail given the specified conditions')
+end
 
 end
 
 %% 5b) use outputs from fric2D and failure asseessment to track fracture growth
-function growFileName = runGROW(fileName,crackLocations, BELength, inputParameters)
+function [] = runGROW(fileName,crackLocations, BELength, inputParameters, GROWInputParameters)
 % this function runs GROW (GROwth by Work-minimization)
 
 % input:
 % fileName: string with the name of a fric2D input file 
+
+fault_flaw  = GROWInputParameters.fault_flaw;
+intact_flaw = GROWInputParameters.intact_flaw;
+
+intact_flaw.xcoord      = crackLocations(:,1);
+intact_flaw.ycoord      = crackLocations(:,2);
+intact_flaw.length      = BELength;
 
 % check if the function was called
 if ~strcmp(inputParameters.user.runGROWModel, 'yes')
@@ -815,42 +855,7 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
 
-% grow input file
-growFileName = 'grow_specs.in';
 
-% grow input  parameters parameter
-
-% this will be part of the command to run GROW
-angleResolution         = 45;
-startAngle              = 45;
-endAngle                = 315;
-
-% parameters tacked on to input file
-fault_flaw              = [];
-fault_flaw.tag          = 'Flaw-Fault'; % tag
-fault_flaw.stiffS       = 10^10;        % shear stiffness           
-fault_flaw.stiffN       = 10^10;        % normal stiffness    
-fault_flaw.cohes        = 0;            % sliding cohesion
-fault_flaw.friction_s   = 0.6;          % static friction
-fault_flaw.friction_d   = 0.0;          % dynamic friction
-fault_flaw.L            = 10^-5;        % critical sliding distance
-
-
-intact_flaw             = [];
-intact_flaw.Tag         = 'Flaw-intact';
-intact_flaw.fault       = 'crittical_point';
-intact_flaw.xcoord      = crackLocations(:,1);
-intact_flaw.ycoord      = crackLocations(:,2);
-intact_flaw.length      = BELength;             
-intact_flaw.grow_both   = 'yes';
-intact_flaw.stiffS      = 0;
-intact_flaw.stiffN      = 10^10;
-intact_flaw.T           = 5;
-intact_flaw.S_0         = 50;
-intact_flaw.cohesion    = 0;
-intact_flaw.friction_s  = 0.6;
-intact_flaw.friction_d  = 0.0;
-intact_flaw.L           = 10^-5;
 
 tempFile = 'grow_temp';
 fid=fopen(tempFile,'w');
@@ -907,17 +912,23 @@ end
 fclose(fid);
 
 profileName                 = [fileName,'_profile.txt'];
-command = sprintf('cat %s %s %s %s > %s', 'input', profileName, tempFile, 'end_bits.txt', [growFileName]);
+command = sprintf('cat %s %s %s %s > %s', ...
+                    'input'                                         , ... 
+                    profileName                                     , ...
+                    tempFile                                        , ...
+                    'end_bits.txt'                                  , ...
+                    GROWInputParameters.growFileName                );
+                
 system(command);
 
 command = sprintf('rm %s', tempFile);
 system(command);
 
-command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'         , ...
-                                growFileName                , ...
-                                angleResolution             , ...
-                                startAngle                      , ...
-                                endAngle                    );
+command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
+                                GROWInputParameters.growFileName  	, ...
+                                GROWInputParameters.angleResolution , ...
+                                GROWInputParameters.startAngle    	, ...
+                                GROWInputParameters.endAngle    	);
                             
 system(command);
 

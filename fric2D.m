@@ -292,9 +292,9 @@ function [inputParameters, GROWInputParameters] = userInput()
 
     % boundary conditions
 
-    inputParameters.boundaryConditions.sigxx       = 100;       % normal stress parallel to faults MPa
-    inputParameters.boundaryConditions.sigyy       = 100;       % normal stress perpendicular to faults MPa
-    inputParameters.boundaryConditions.shear       = 40;        % shear stress on faults  MPa
+    inputParameters.boundaryConditions.sigxx       = -100;       % normal stress parallel to faults MPa
+    inputParameters.boundaryConditions.sigyy       = -100;       % normal stress perpendicular to faults MPa
+    inputParameters.boundaryConditions.shear       = -40;        % shear stress on faults  MPa
 
     % end bits
     inputParameters.boundaryConditions.BVSTop      = -0.0000445;  % displacement on left end bit (m)
@@ -754,9 +754,12 @@ for iBE = 1:numBE
     
     tensor      =  [sigma11(iBE), sigma12(iBE); ...
                     sigma12(iBE), sigma22(iBE)];
+                            
     eigenValues = eig(tensor);
-    sigma1      = eigenValues(1);
-    sigma3      = eigenValues(2);
+    
+    % DOING GEOLOGY FOR A MOMENT HERE
+    sigma1      = -eigenValues(2);
+    sigma3      = -eigenValues(1);
     
     tau_m       = (sigma1-sigma3)/2;
     sigma_m     = (sigma1+sigma3)/2;
@@ -777,11 +780,8 @@ tempTC(tempTC<0) = 0;
 [~,shearFailureInd  ] = findpeaks(tempCC,'SortStr', 'descend'); % find peak stresses and sort their indices
 [~,tensileFailureInd] = findpeaks(tempTC,'SortStr', 'descend');
 
-shearFailureCoord     =  [X(shearFailureInd+1), ... 
-                                        Y(shearFailureInd+1)];
-                               
-tensileFailureCoord   =  [X(tensileFailureInd+1), ...
-                                       Y(tensileFailureInd+1)];                     
+shearFailureCoord     =  [X(shearFailureInd+1), Y(shearFailureInd+1)];                           
+tensileFailureCoord   =  [X(tensileFailureInd+1), Y(tensileFailureInd+1)];                     
                      
 end
 
@@ -816,25 +816,13 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
 
-if      strcmp(userChoice, 'all')
-    CRACKLOCATION = [shearFailureCoord;tensileFailureCoord];
-    warning('Running all crack locations may be computationally expensive')
-elseif  strcmp(userChoice, 'tensile')
-    CRACKLOCATION = tensileFailureCoord;
-elseif  strcmp(userChoice, 'max tensile')
-    CRACKLOCATION = tensileFailureCoord(1,:); % max is the first location because the list is sorted
-    
-elseif  strcmp(userChoice, 'shear')
-    CRACKLOCATION = shearFailureCoord;
-    
-elseif  strcmp(userChoice, 'max coulomb')
-    CRACKLOCATION = shearFailureCoord(1,:); % max is the first location because the list is sorted
-else
-    error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
-end
-
-if isempty(CRACKLOCATION)
-    error('No cracks will fail given the specified conditions')
+CRACKLOCATION = [];
+if      strcmp(userChoice, 'all');          try CRACKLOCATION = [shearFailureCoord;tensileFailureCoord]; end 
+elseif  strcmp(userChoice, 'tensile');      try CRACKLOCATION = tensileFailureCoord; end
+elseif  strcmp(userChoice, 'max tensile');  try CRACKLOCATION = tensileFailureCoord(1,:); end % max is the first location because the list is sorted   
+elseif  strcmp(userChoice, 'shear');        try CRACKLOCATION = shearFailureCoord; end  
+elseif  strcmp(userChoice, 'max coulomb');  try CRACKLOCATION = shearFailureCoord(1,:); end % max is the first location because the list is sorted
+else;                                       error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
 end
 
 end
@@ -861,9 +849,10 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
         error('inputParameters.user.runGROWModel in input section must be ''yes'' or ''no''')
     end
     return
+elseif isempty(crackLocations)
+    disp('No cracks will fail given the specified conditions')
+    return
 end
-
-
 
 tempFile = 'grow_temp';
 fid=fopen(tempFile,'w');

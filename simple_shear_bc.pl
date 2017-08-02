@@ -31,6 +31,17 @@ use POSIX;
 # $sigyy = 100;  #normal stress perpendicular to faults MPa
 # $shear = 4000000;   #shear stress on faults  MPa
 
+# !!!!!!!!!!!!!!!!!!!!!!!HACK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# this script uses the geological sign convention, to make the
+# notation uniform with that of Fric2d/GROW, the input sign notation 
+# will follow the tensile-positive convetion and be converted here
+
+$sigxx = -$sigxx
+$sigyy = -$sigyy
+$shear = -$shear
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 $name = 'input';
 
 $elenum=0;  #counts the number of elements
