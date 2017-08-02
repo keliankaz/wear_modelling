@@ -50,7 +50,7 @@ function [] = fric2D(fileName,X,Y)
 
 %% input parameters:
 % -----------------------------------------------------------------------
-inputParameters  = userInput();
+[inputParameters, GROWInputParameters]  = userInput();
 % -----------------------------------------------------------------------
 
 %% work flow:
@@ -79,7 +79,7 @@ crackLocations = choosecracks(shearFailureCoord  , tensileFailureCoord  , ...
                               inputParameters.user.cracks2grow, inputParameters);
 
 % 5b) run GROW with the chosen ckracks
-growOutputFile = runGROW(fileName, crackLocations, meanSegmentLength, inputParameters);    
+runGROW(fileName, crackLocations, meanSegmentLength, inputParameters, GROWInputParameters);    
 
 %% 6) extract GROW output (not finished)
 % GROWOutputStruct = extractGROWoutput(growOutputFile, crackLocations);
@@ -279,7 +279,7 @@ end
 %% ------------------- User Input --------------------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function inputParameters = userInput()
+function [inputParameters, GROWInputParameters] = userInput()
     inputParameters = [];
 
     % material parameters:
@@ -311,7 +311,48 @@ function inputParameters = userInput()
                                                                  % 'max tensile'    most tensile crack
                                                                  % 'max coulomb'      most sheared crack                                                            
     inputParameters.user.runGROWModel              = 'yes' ;     % run grow ('yes' or 'no')
-    % GROW inputs are all in the runGROW function
+    
+    
+    % GROW inputs
+    
+    GROWInputParameters = [];
+    
+    GROWInputParameters.growFileName = 'grow_specs.in';
+    
+    % grow input  parameters parameter
+    
+    % this will be part of the command to run GROW
+    GROWInputParameters.angleResolution         = 45;
+    GROWInputParameters.startAngle              = 45;
+    GROWInputParameters.endAngle                = 315;
+    
+    % parameters tacked on to input file
+    fault_flaw              = [];
+    fault_flaw.tag          = 'Flaw-Fault'; % tag
+    fault_flaw.stiffS       = 10^10;        % shear stiffness
+    fault_flaw.stiffN       = 10^10;        % normal stiffness
+    fault_flaw.cohes        = 0;            % sliding cohesion
+    fault_flaw.friction_s   = 0.6;          % static friction
+    fault_flaw.friction_d   = 0.0;          % dynamic friction
+    fault_flaw.L            = 10^-5;        % critical sliding distance
+    
+    
+    intact_flaw             = [];
+    intact_flaw.Tag         = 'Flaw-intact';
+    intact_flaw.fault       = 'crittical_point';    
+    intact_flaw.grow_both   = 'yes';
+    intact_flaw.stiffS      = 0;
+    intact_flaw.stiffN      = 10^10;
+    intact_flaw.T           = 5;
+    intact_flaw.S_0         = 50;
+    intact_flaw.cohesion    = 0;
+    intact_flaw.friction_s  = 0.6;
+    intact_flaw.friction_d  = 0.0;
+    intact_flaw.L           = 10^-5;
+    
+    GROWInputParameters.fault_flaw = fault_flaw;
+    GROWInputParameters.intact_flaw = intact_flaw;
+    
 end
 
 
@@ -799,11 +840,18 @@ end
 end
 
 %% 5b) use outputs from fric2D and failure asseessment to track fracture growth
-function growFileName = runGROW(fileName,crackLocations, BELength, inputParameters)
+function [] = runGROW(fileName,crackLocations, BELength, inputParameters, GROWInputParameters)
 % this function runs GROW (GROwth by Work-minimization)
 
 % input:
 % fileName: string with the name of a fric2D input file 
+
+fault_flaw  = GROWInputParameters.fault_flaw;
+intact_flaw = GROWInputParameters.intact_flaw;
+
+intact_flaw.xcoord      = crackLocations(:,1);
+intact_flaw.ycoord      = crackLocations(:,2);
+intact_flaw.length      = BELength;
 
 % check if the function was called
 if ~strcmp(inputParameters.user.runGROWModel, 'yes')
@@ -815,42 +863,7 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
 
-% grow input file
-growFileName = 'grow_specs.in';
 
-% grow input  parameters parameter
-
-% this will be part of the command to run GROW
-angleResolution         = 45;
-startAngle              = 45;
-endAngle                = 315;
-
-% parameters tacked on to input file
-fault_flaw              = [];
-fault_flaw.tag          = 'Flaw-Fault'; % tag
-fault_flaw.stiffS       = 10^10;        % shear stiffness           
-fault_flaw.stiffN       = 10^10;        % normal stiffness    
-fault_flaw.cohes        = 0;            % sliding cohesion
-fault_flaw.friction_s   = 0.6;          % static friction
-fault_flaw.friction_d   = 0.0;          % dynamic friction
-fault_flaw.L            = 10^-5;        % critical sliding distance
-
-
-intact_flaw             = [];
-intact_flaw.Tag         = 'Flaw-intact';
-intact_flaw.fault       = 'crittical_point';
-intact_flaw.xcoord      = crackLocations(:,1);
-intact_flaw.ycoord      = crackLocations(:,2);
-intact_flaw.length      = BELength;             
-intact_flaw.grow_both   = 'yes';
-intact_flaw.stiffS      = 0;
-intact_flaw.stiffN      = 10^10;
-intact_flaw.T           = 5;
-intact_flaw.S_0         = 50;
-intact_flaw.cohesion    = 0;
-intact_flaw.friction_s  = 0.6;
-intact_flaw.friction_d  = 0.0;
-intact_flaw.L           = 10^-5;
 
 tempFile = 'grow_temp';
 fid=fopen(tempFile,'w');
@@ -907,17 +920,23 @@ end
 fclose(fid);
 
 profileName                 = [fileName,'_profile.txt'];
-command = sprintf('cat %s %s %s %s > %s', 'input', profileName, tempFile, 'end_bits.txt', [growFileName]);
+command = sprintf('cat %s %s %s %s > %s', ...
+                    'input'                                         , ... 
+                    profileName                                     , ...
+                    tempFile                                        , ...
+                    'end_bits.txt'                                  , ...
+                    GROWInputParameters.growFileName                );
+                
 system(command);
 
 command = sprintf('rm %s', tempFile);
 system(command);
 
-command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'         , ...
-                                growFileName                , ...
-                                angleResolution             , ...
-                                startAngle                      , ...
-                                endAngle                    );
+command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
+                                GROWInputParameters.growFileName  	, ...
+                                GROWInputParameters.angleResolution , ...
+                                GROWInputParameters.startAngle    	, ...
+                                GROWInputParameters.endAngle    	);
                             
 system(command);
 
