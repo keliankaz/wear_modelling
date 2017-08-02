@@ -292,8 +292,8 @@ function inputParameters = userInput()
 
     % boundary conditions
 
-    inputParameters.boundaryConditions.sigxx       = 100;       % normal stress parallel to faults MPa
-    inputParameters.boundaryConditions.sigyy        = 100;       % normal stress perpendicular to faults MPa
+    inputParameters.boundaryConditions.sigxx       = -100;       % normal stress parallel to faults MPa
+    inputParameters.boundaryConditions.sigyy        = -100;       % normal stress perpendicular to faults MPa
     inputParameters.boundaryConditions.shear       = 40;        % shear stress on faults  MPa
 
     % end bits
@@ -302,7 +302,7 @@ function inputParameters = userInput()
 
     % user choices
 
-    inputParameters.user.showFric2DOutput           = 'no';     % plot output from fric2d ('yes' or 'no')
+    inputParameters.user.showFric2DOutput           = 'yes';     % plot output from fric2d ('yes' or 'no')
     inputParameters.user.cracks2grow                = 'max coulomb';     % 'all':           all the coordinates specified in input (tensile+shear)
                                                                  % 'tensile':       only cracks that failed in tensile stress (listed in
                                                                  %                  tensileFailureCoord)
@@ -740,9 +740,7 @@ shearFailureCoord     =  [X(shearFailureInd+1), ...
                                         Y(shearFailureInd+1)];
                                
 tensileFailureCoord   =  [X(tensileFailureInd+1), ...
-                                       Y(tensileFailureInd+1)];
-
-                     
+                                       Y(tensileFailureInd+1)];                     
                      
 end
 
@@ -777,25 +775,27 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
 
-
 if      strcmp(userChoice, 'all')
     CRACKLOCATION = [shearFailureCoord;tensileFailureCoord];
     warning('Running all crack locations may be computationally expensive')
+    if isempty(CRACKLOCATION)
+        error('There are no points that will fail in shear or in tension')
+    end
 elseif  strcmp(userChoice, 'tensile')
     CRACKLOCATION = tensileFailureCoord;
+elseif  strcmp(userChoice, 'max tensile')
+    CRACKLOCATION = tensileFailureCoord(1,:); % max is the first location because the list is sorted
     
 elseif  strcmp(userChoice, 'shear')
     CRACKLOCATION = shearFailureCoord;
-    
-elseif  strcmp(userChoice, 'max tensile')
-    CRACKLOCATION = tensileFailureCoord(1,:); % max is the first location because the list is sorted
     
 elseif  strcmp(userChoice, 'max coulomb')
     CRACKLOCATION = shearFailureCoord(1,:); % max is the first location because the list is sorted
 else
     error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
 end
-                  
+
+
 end
 
 %% 5b) use outputs from fric2D and failure asseessment to track fracture growth
@@ -817,7 +817,6 @@ end
 
 % grow input file
 growFileName = 'grow_specs.in';
-path2GrowFile = 'GROW/';
 
 % grow input  parameters parameter
 
@@ -857,60 +856,6 @@ tempFile = 'grow_temp';
 fid=fopen(tempFile,'w');
 
 for iFlaw = 1:length(intact_flaw.xcoord)
-
-% growInputSpecL1 = '*%s %s %s %s %s %s %s \n';
-% fprintf(fid,growInputSpecL1, ...
-%                                 'tag', ...
-%                                 'stiffS', ...
-%                                 'stiffN',...
-%                                 'cohes', ...
-%                                 'fric-s', ...
-%                                 'fric-d',...
-%                                 'L');
-% 
-% growInputSpecL2 = '*%s %f %f %f %f %f %f \n';
-% fprintf(fid,growInputSpecL2, ...
-%                                 fault_flaw.tag              , ...
-%                                 fault_flaw.stiffS           , ...
-%                                 fault_flaw.stiffN           , ...
-%                                 fault_flaw.cohes            , ...
-%                                 fault_flaw.friction_s       , ...
-%                                 fault_flaw.friction_d       , ...
-%                                 fault_flaw.L                );
-%                             
-% growInputSpecL3 = '*%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n';                            
-% fprintf(fid,growInputSpecL3, ...
-%                                 'Tag', ...
-%                                 'fault', ...
-%                                 'xcoor', ...
-%                                 'ycoor', ...
-%                                 'length', ...
-%                                 'grow_both?', ...
-%                                 'stiffS', ...
-%                                 'stiffN', ...
-%                                 'T', ...
-%                                 'S_0', ...
-%                                 'cohes', ...
-%                                 'friction-s', ...
-%                                 'friction-d', ...
-%                                 'L');
-% 
-% growInputSpecL4 = '%s %s %f %f %f %s %f %f %f %f %f %f %f %f\n';
-% fprintf(fid,growInputSpecL4, ...
-%                                 intact_flaw.Tag             , ...
-%                                 [intact_flaw.fault,num2str(iFlaw)], ...
-%                                 intact_flaw.xcoord(iFlaw)   , ...
-%                                 intact_flaw.ycoord(iFlaw)   , ...
-%                                 intact_flaw.length          , ...
-%                                 intact_flaw.grow_both       , ...
-%                                 intact_flaw.stiffS          , ...
-%                                 intact_flaw.stiffN          , ...
-%                                 intact_flaw.T               , ...
-%                                 intact_flaw.S_0             , ...
-%                                 intact_flaw.cohesion        , ...    
-%                                 intact_flaw.friction_s      , ...    
-%                                 intact_flaw.friction_d      , ...
-%                                 intact_flaw.L               );
 
 growInputSpecL1 = '*%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n';                            
 fprintf(fid,growInputSpecL1, ...
@@ -997,9 +942,6 @@ end
 %% 8) Organize files (function is located in embeded function section)
 
 
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% --------------------- Being built ---------------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1063,10 +1005,9 @@ end
 % Get crack info:
 
 for iCrack = 1:numCrack
+   % exctract data for each crack
    
-end % for iCrack = 1:numCrack
-
-% steps:
+   % steps:
 % define headers (what will they be?)
 
 % get block of data
@@ -1077,9 +1018,9 @@ end % for iCrack = 1:numCrack
 
 % for now the key blocks of data that I want are the crack geometry
 % need to know what the header sections will be as well
-
-
-end
+end % for iCrack = 1:numCrack
+    
+end % function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
 
 
 
