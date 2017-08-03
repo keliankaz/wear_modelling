@@ -36,9 +36,9 @@ use POSIX;
 # notation uniform with that of Fric2d/GROW, the input sign notation 
 # will follow the tensile-positive convetion and be converted here
 
-$sigxx = -$sigxx
-$sigyy = -$sigyy
-$shear = -$shear
+$sigxx = -$sigxx;
+$sigyy = -$sigyy;
+$shear = -$shear;
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -181,8 +181,7 @@ close(BOUND);
                 print FILE "*----------------------         \n";                                                                                
                 print FILE "*fault  name    grow_tails?     from_end1?      from_end2?  \n";                                                             
                 print FILE "*num    xbeg    ybeg    xend    yend    stiffS          stiffN          ten-str init-coh slid-coh stat-fric dy-fric crit-slip \n";
-                print FILE "*----   ----    ----    ----    ----    ------          ------          ---     ---     -----     -------   ------  --------- \n";
-                print FILE "fault   rough    yes     no      no                                                 \n";             
+                print FILE "*----   ----    ----    ----    ----    ------          ------          ---     ---     -----     -------   ------  --------- \n";           
 
 
 

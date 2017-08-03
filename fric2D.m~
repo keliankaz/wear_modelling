@@ -12,7 +12,6 @@ function [] = fric2D(fileName,X,Y)
 
 % OUTPUT:
 % 
-
 % must be in same folder as:
 % - simple_shear_bc.pl
 % - fric2D files
@@ -41,7 +40,7 @@ function [] = fric2D(fileName,X,Y)
 
 % failure parameters: cohesion and angle of internal frinction
 % assessfailure: 458-459                    c           = 5;    % cohesion
-%                                                         theta       = 20;   % angle of internal friction
+% theta       = 20;   % angle of internal friction
 
 
 %--------------------------------------------------------------------------
@@ -76,13 +75,17 @@ outputStruct = extractoutput(fileName);
 % 5a)choose which crack(s) to grow (now set to 'all', could alternatively
 % be one of: 'all', 'tensile', 'shear', 'max coulomb', and 'max tensile')
 crackLocations = choosecracks(shearFailureCoord  , tensileFailureCoord  , ...
-                              inputParameters.user.cracks2grow, inputParameters);
+                              inputParameters.user.cracks2grow, inputParameters)
 
+if ~isempty(crackLocations)                           
 % 5b) run GROW with the chosen ckracks
-runGROW(fileName, crackLocations, meanSegmentLength, inputParameters, GROWInputParameters);    
+%runGROW(fileName, crackLocations, meanSegmentLength, inputParameters, GROWInputParameters);    
+runGROW(newX, Y, crackLocations,inputParameters, GROWInputParameters);    
 
 %% 6) extract GROW output (not finished)
-% GROWOutputStruct = extractGROWoutput(growOutputFile, crackLocations);
+% GROWOutputStruct = extractGROWoutput(GROWInputParameters.growFileName, crackLocations);
+
+end
 
 %% 7)  graphically show entire output
 plotoutputinfo
@@ -292,9 +295,9 @@ function [inputParameters, GROWInputParameters] = userInput()
 
     % boundary conditions
 
-    inputParameters.boundaryConditions.sigxx       = 100;       % normal stress parallel to faults MPa
-    inputParameters.boundaryConditions.sigyy       = 100;       % normal stress perpendicular to faults MPa
-    inputParameters.boundaryConditions.shear       = 40;        % shear stress on faults  MPa
+    inputParameters.boundaryConditions.sigxx       = -80;       % normal stress parallel to faults MPa
+    inputParameters.boundaryConditions.sigyy       = -80;       % normal stress perpendicular to faults MPa
+    inputParameters.boundaryConditions.shear       = -120;        % shear stress on faults  MPa
 
     % end bits
     inputParameters.boundaryConditions.BVSTop      = -0.0000445;  % displacement on left end bit (m)
@@ -317,7 +320,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     GROWInputParameters = [];
     
-    GROWInputParameters.growFileName = 'grow_specs.in';
+    GROWInputParameters.growFileName = 'grow_specs';
     
     % grow input  parameters parameter
     
@@ -331,6 +334,8 @@ function [inputParameters, GROWInputParameters] = userInput()
     fault_flaw.tag          = 'Flaw-Fault'; % tag
     fault_flaw.stiffS       = 10^10;        % shear stiffness
     fault_flaw.stiffN       = 10^10;        % normal stiffness
+    fault_flaw.T            = 1;            % Tensional strenght
+    fault_flaw.S_0          = 1;            % Internal shear strength
     fault_flaw.cohes        = 0;            % sliding cohesion
     fault_flaw.friction_s   = 0.6;          % static friction
     fault_flaw.friction_d   = 0.0;          % dynamic friction
@@ -406,10 +411,12 @@ boxAspectRatio = 0.2;
 
 [X, meanSegmentLength,boxSize] = makeprofile(profileName,X,Y,padding, boxAspectRatio);
 
-% create boundary condition
+% create boundary condition (creates a file named 'input')
     % input ptspacing based on number of points
     % simple_shear_bc.pl 0.06 0.15 0.0002
     % (based on profile1)
+
+    input_section_fileName = 'input';
     
 commandFormat = 'perl simple_shear_bc.pl %f %f %f %f %f %f %f %f';    
 command = sprintf(commandFormat         , ...
@@ -436,8 +443,14 @@ numBufferSegments = floor(boxSize(1)/(padding(1)*4*meanSegmentLength));
 make_end_bits(X,Y, numBufferSegments, BVSTop, BVSBot);
 % make the length of the end bit a function of the profile length
 
-% concatenatem to the input file
-command = sprintf('cat %s %s %s > %s', 'input', profileName, 'end_bits.txt', [fileName, '.in']);
+% add tag line for the first fault
+fault_header_fileName = 
+fid=fopen(fault_header.txt,'w');
+fprintf(fid, 'fault segment_0 yes no no\n');
+fclose(fid);
+
+% concatenate to the input file
+command = sprintf('cat %s %s %s > %s', input_section_fileName, fault profileName, 'end_bits.txt', [fileName, '.in']);
 system(command);
 
 % more options...
@@ -463,6 +476,7 @@ RX = range(X);
 RY = range(Y);
 
 MEAN_SEGMENT_LENGTH = mean(sqrt((X(2:end)-X(1:(end-1))).^2 +(Y(2:end)-Y(1:(end-1))).^2));
+MEAN_SEGMENT_LENGTH = round(MEAN_SEGMENT_LENGTH,1,'significant');
 
 % boxSize = padding.*[RX,RY]; % not great because the box size changes as a
 % function of topography, which is bad if set in a loop
@@ -472,6 +486,9 @@ MEAN_SEGMENT_LENGTH = mean(sqrt((X(2:end)-X(1:(end-1))).^2 +(Y(2:end)-Y(1:(end-1
 boxSize = zeros(1,2); 
 boxSize(1) = padding(1)*RX;
 boxSize(2) = boxSize(1)*boxAspectRatio;
+
+% round boxsize to nearest multiple of boundary element length
+boxSize = ceil(boxSize/MEAN_SEGMENT_LENGTH)*MEAN_SEGMENT_LENGTH;
 
 % errors/warnings related to profile in relation to box size
 if max(abs(Y))>boxSize(2)*0.1
@@ -539,9 +556,9 @@ ROW2    = [numBufferSegments, start2,end2,kode(2),bvs(2),bvn(2),BVS(2),BVN(2)];
 
 % write them to the file
 fprintf(fileID, 'fracture left no no');
-fprintf(fileID, '\n %f %f %f %f %f %f %f %f %f %f \n\n',ROW1);
+fprintf(fileID, '\n%f %f %f %f %f %f %f %f %f %f \n\n',ROW1);
 fprintf(fileID, 'fracture right no no');
-fprintf(fileID, '\n %f %f %f %f %f %f %f %f %f %f \n\n',ROW2);
+fprintf(fileID, '\n%f %f %f %f %f %f %f %f %f %f \n\n',ROW2);
 fclose(fileID);
 
 end
@@ -774,8 +791,8 @@ end
 tempCC = coulombCriterion;
 tempTC = tensileCriterion;
 
-tempCC(tempCC<0) = 0; % remove section that are not going to fail
-tempTC(tempTC<0) = 0;
+%tempCC(tempCC<0) = 0; % remove section that are not going to fail
+%tempTC(tempTC<0) = 0;
 
 [~,shearFailureInd  ] = findpeaks(tempCC,'SortStr', 'descend'); % find peak stresses and sort their indices
 [~,tensileFailureInd] = findpeaks(tempTC,'SortStr', 'descend');
@@ -825,25 +842,41 @@ elseif  strcmp(userChoice, 'max coulomb');  try CRACKLOCATION = shearFailureCoor
 else;                                       error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
 end
 
-if isempty(CRACKLOCATION)
-    error('No cracks will fail given the specified conditions')
+if isempty(CRACKLOCATION) 
+    disp('No cracks will fail given the specified conditions')
+    return
 end
 
 end
+
+
+
+%% 6) extract Grow output (being  built)
+
+%% 7) visually diaplay output information (function is located in embeded function section)
+
+%% 8) Organize files (function is located in embeded function section)
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% --------------------- Being built ---------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% 5b) use outputs from fric2D and failure asseessment to track fracture growth
-function [] = runGROW(fileName,crackLocations, BELength, inputParameters, GROWInputParameters)
+%function [] = runGROW(fileName,crackLocations, BELength, inputParameters, GROWInputParameters)
+function [] = runGROW(X, Y, crackLocations, inputParameters, GROWInputParameters)
 % this function runs GROW (GROwth by Work-minimization)
 
 % input:
 % fileName: string with the name of a fric2D input file 
+
+GROWInputFileName = [GROWInputParameters.growFileName, '.in'];
 
 fault_flaw  = GROWInputParameters.fault_flaw;
 intact_flaw = GROWInputParameters.intact_flaw;
 
 intact_flaw.xcoord      = crackLocations(:,1);
 intact_flaw.ycoord      = crackLocations(:,2);
-intact_flaw.length      = BELength;
 
 % check if the function was called
 if ~strcmp(inputParameters.user.runGROWModel, 'yes')
@@ -853,85 +886,219 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
         error('inputParameters.user.runGROWModel in input section must be ''yes'' or ''no''')
     end
     return
+
 end
 
+% tempFile = 'grow_temp';
+% fid=fopen(tempFile,'w');
+% 
+% for iFlaw = 1:length(intact_flaw.xcoord)
+% 
+% growInputSpecL1 = '*%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n';                            
+% fprintf(fid,growInputSpecL1, ...
+%                                 'Tag', ...
+%                                 'fault', ...
+%                                 'xcoor', ...
+%                                 'ycoor', ...
+%                                 'length', ...
+%                                 'grow_both?', ...
+%                                 'stiffS', ...
+%                                 'stiffN', ...
+%                                 'T', ...
+%                                 'S_0', ...
+%                                 'cohes', ...
+%                                 'friction-s', ...
+%                                 'friction-d', ...
+%                                 'L');
+% 
+% growInputSpecL2 = '*%s %f %f %f %f %f %f \n';
+% fprintf(fid,growInputSpecL2, ...
+%                                 fault_flaw.tag              , ...
+%                                 fault_flaw.stiffS           , ...
+%                                 fault_flaw.stiffN           , ...
+%                                 fault_flaw.cohes            , ...
+%                                 fault_flaw.friction_s       , ...
+%                                 fault_flaw.friction_d       , ...
+%                                 fault_flaw.L                );
+%                            
+% 
+% growInputSpecL4 = '*%s %s %f %f %f %s %f %f %f %f %f %f %f %f\n\n';
+% fprintf(fid,growInputSpecL4, ...
+%                                 intact_flaw.Tag             , ...
+%                                 [intact_flaw.fault,num2str(iFlaw)], ...
+%                                 intact_flaw.xcoord(iFlaw)   , ...
+%                                 intact_flaw.ycoord(iFlaw)   , ...
+%                                 intact_flaw.length          , ...
+%                                 intact_flaw.grow_both       , ...
+%                                 intact_flaw.stiffS          , ...
+%                                 intact_flaw.stiffN          , ...
+%                                 intact_flaw.T               , ...
+%                                 intact_flaw.S_0             , ...
+%                                 intact_flaw.cohesion        , ...    
+%                                 intact_flaw.friction_s      , ...    
+%                                 intact_flaw.friction_d      , ...
+%                                 intact_flaw.L               );
+% 
+% end
+% 
+% fclose(fid);
+% 
+% profileName                 = [fileName,'_profile.txt'];
+% command = sprintf('cat %s %s %s %s > %s', ...
+%                     'input'                                         , ... 
+%                     profileName                                     , ...
+%                     tempFile                                        , ...
+%                     'end_bits.txt'                                  , ...
+%                     GROWInputParameters.growFileName                );
+%                 
+% system(command);
+% 
+% command = sprintf('rm %s', tempFile);
+% system(command);
+% 
+% command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
+%                                 GROWInputParameters.growFileName  	, ...
+%                                 GROWInputParameters.angleResolution , ...
+%                                 GROWInputParameters.startAngle    	, ...
+%                                 GROWInputParameters.endAngle    	);
+%                             
+% system(command);
 
 
-tempFile = 'grow_temp';
-fid=fopen(tempFile,'w');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%% completely different approach %%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for iFlaw = 1:length(intact_flaw.xcoord)
+% split fault into two and add *Crack tag to the on of the fauts. One of
+% the faults will be allowed to grow from one of its ends
 
-growInputSpecL1 = '*%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n';                            
-fprintf(fid,growInputSpecL1, ...
-                                'Tag', ...
-                                'fault', ...
-                                'xcoor', ...
-                                'ycoor', ...
-                                'length', ...
-                                'grow_both?', ...
-                                'stiffS', ...
-                                'stiffN', ...
-                                'T', ...
-                                'S_0', ...
-                                'cohes', ...
-                                'friction-s', ...
-                                'friction-d', ...
-                                'L');
+% run for-loop over fault block
+% when hit a failure point add header line
+% \n\n
+% fault rough-n yes yes no
+% *Tag stiffS stiffN T S_0 cohes friction-s friction-d L 
+% *Crack  1e10 1e10 1.000000 40.000000 0.000000 0.600000 0.000000 0.000010
 
-growInputSpecL2 = '*%s %f %f %f %f %f %f \n';
-fprintf(fid,growInputSpecL2, ...
-                                fault_flaw.tag              , ...
+% the above are input parameters (make these editable)
+
+% 
+
+% cat together input section, boundary conditions, spliced faults, endbit
+
+
+done = 1;
+if done
+    
+    numCrack = size(crackLocations,1);
+    
+    % splice profile:
+    % this is not exactly the smartest way to do this...
+    spliced_profile_fileName = 'spliced_profile_temp.txt';
+    fid = fopen(spliced_profile_fileName,'w');
+    
+    % print first header line
+    fprintf(fid, 'fault segment_1 yes no yes\n');
+    fprintf(fid, '*%s %s %s %s %s %s %s %s %s\n', ...
+                             'Crack'                        , ...
+                             'stiffS'                       , ...
+                             'stiffN'                       , ...
+                             'T'                            , ...
+                             'S_0'                          , ...
+                             'cohes'                        , ...
+                             'friction-s'                   , ...
+                             'friction-d'                   , ...
+                             'L'                            );
+                         
+                fprintf(fid, '*%f %f %f %f %f %f %f %f %f\n', ...
+                                'Crack'                     , ...
                                 fault_flaw.stiffS           , ...
                                 fault_flaw.stiffN           , ...
+                                fault_flaw.T                , ...
+                                fault_flaw.S_0              , ...
                                 fault_flaw.cohes            , ...
                                 fault_flaw.friction_s       , ...
                                 fault_flaw.friction_d       , ...
                                 fault_flaw.L                );
-                           
+    
+    crackCount = 0;
+    for n = 1:(length(X)-1)
+        
+        if any(X(n) == crackLocations(:,1))
+            
+            crackCount = crackCount+1;
+            
+            if crackCount ~= numCrack
 
-growInputSpecL4 = '*%s %s %f %f %f %s %f %f %f %f %f %f %f %f\n\n';
-fprintf(fid,growInputSpecL4, ...
-                                intact_flaw.Tag             , ...
-                                [intact_flaw.fault,num2str(iFlaw)], ...
-                                intact_flaw.xcoord(iFlaw)   , ...
-                                intact_flaw.ycoord(iFlaw)   , ...
-                                intact_flaw.length          , ...
-                                intact_flaw.grow_both       , ...
-                                intact_flaw.stiffS          , ...
-                                intact_flaw.stiffN          , ...
-                                intact_flaw.T               , ...
-                                intact_flaw.S_0             , ...
-                                intact_flaw.cohesion        , ...    
-                                intact_flaw.friction_s      , ...    
-                                intact_flaw.friction_d      , ...
-                                intact_flaw.L               );
+                % printing the following to the file:         
 
-end
+                %             fault   rough1    yes     no      yes    
+                % *Tag stiffS stiffN T S_0 cohes friction-s friction-d L 
+                % *Crack  1e10 1e10 1.000000 1.000000 0.000000 0.600000 0.000000 0.000010
 
-fclose(fid);
-
-profileName                 = [fileName,'_profile.txt'];
-command = sprintf('cat %s %s %s %s > %s', ...
-                    'input'                                         , ... 
-                    profileName                                     , ...
-                    tempFile                                        , ...
-                    'end_bits.txt'                                  , ...
-                    GROWInputParameters.growFileName                );
+                fprintf(fid, '\n');
+                fprintf(fid, 'fault segment_%i yes no yes\n'  , crackCount);
+                fprintf(fid, '*%s %s %s %s %s %s %s %s %s\n', ...
+                             'Crack'                        , ...
+                             'stiffS'                       , ...
+                             'stiffN'                       , ...
+                             'T'                            , ...
+                             'S_0'                          , ...
+                             'cohes'                        , ...
+                             'friction-s'                   , ...
+                             'friction-d'                   , ...
+                             'L'                            );
+                         
+                fprintf(fid, '*%f %f %f %f %f %f %f %f %f\n', ...
+                                'Crack'                     , ...
+                                fault_flaw.stiffS           , ...
+                                fault_flaw.stiffN           , ...
+                                fault_flaw.T                , ...
+                                fault_flaw.S_0              , ...
+                                fault_flaw.cohes            , ...
+                                fault_flaw.friction_s       , ...
+                                fault_flaw.friction_d       , ...
+                                fault_flaw.L                );
+                             
+            else % if crackCount ~= numCrack
                 
-system(command);
-
-command = sprintf('rm %s', tempFile);
-system(command);
-
-command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
-                                GROWInputParameters.growFileName  	, ...
-                                GROWInputParameters.angleResolution , ...
-                                GROWInputParameters.startAngle    	, ...
-                                GROWInputParameters.endAngle    	);
-                            
-system(command);
-
+                % if it is the last crack, we do not want to grow the end
+                % of the fault
+                
+                fprintf(fid,'\n');
+                fprintf(fid,'segment_%i yes no no\n', crackCount);
+            end
+        else %if newX(n) == crackLocations
+        
+        % print fault geometry to file
+        fprintf(fid, ...
+            '1 %f %f %f %f 0 1.00E+10 0 0 0 1 1 0\n', ...
+            [X(n),  Y(n),  X(n+1),   Y(n+1)]');
+        
+        end
+    end
+    
+    fprintf(fid,'\n');
+    fclose(fid);
+    
+    % concatenate the input file (generate by simple_shear.pl), the pro
+    command = sprintf(  'cat %s %s %s > %s', ...
+                        'input'                             , ...
+                        spliced_profile_fileName            , ...
+                        'end_bits.txt'                      , ...
+                        GROWInputFileName);
+    system(command);
+    
+    
+    command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
+        GROWInputFileName                   , ...
+        GROWInputParameters.angleResolution , ...
+        GROWInputParameters.startAngle    	, ...
+        GROWInputParameters.endAngle    	);
+    
+    system(command);
+    
+    
+end
 
 % stuff from Michele
 %- add lines in the Fault conditions section: (make sure parameters
@@ -945,17 +1112,6 @@ system(command);
 
 
 end
-
-%% 6) extract Grow output (being  built)
-
-%% 7) visually diaplay output information (function is located in embeded function section)
-
-%% 8) Organize files (function is located in embeded function section)
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% --------------------- Being built ---------------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% extract Grow output
 
@@ -995,26 +1151,26 @@ if strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
         
-outputFileName = [fileName,'.out'];
+outputFileName = [growFileName,'.out'];
 
 % load in block of data (TERRIBLE IDEA BUT FUCK IT): 
 
 % determine howmany cracks where grown
 crackLocDim = size(crackLoc);
 numCracks = crackLocDim(1);
-blocksPerCrack = 2; % make sure this is correct
-expectedFric2dDataBlocks = 9; % this is here to make sure that I'm not fucking up the parsing of the output
+blocksPerCrack = 1; % make sure this is correct
+expectedFric2dDataBlocks = 4; % this is here to make sure that I'm not fucking up the parsing of the output
 expectedDataBlocks = expectedFric2dDataBlocks + blocksPerCrack*numCrack;
 
 dataBlocks = read_blocks_of_numerical_data(outputFileName, 1000);
 numBlocks  = length(dataBlocks);
 
+% double checking that the number of blocks is right
 if numBlocks ~= expectedDataBlocks
     error('the GROW output is not of the expected size consider double-checking output parsing')
 end
 
 % Get crack info:
-
 for iCrack = 1:numCrack
    % exctract data for each crack
    
@@ -1032,8 +1188,6 @@ for iCrack = 1:numCrack
 end % for iCrack = 1:numCrack
     
 end % function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
-
-
 
 
 
