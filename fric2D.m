@@ -228,7 +228,7 @@ end
 % move all file that start with 'fileName' into new directory
 command = sprintf('mv %s %s', [fileName,'.*'], [newDirectoryName,'/']);
 system(command);
-command = sprintf('mv %s %s', 'grow_specs.*', [newDirectoryName,'/']);
+command = sprintf('mv %s %s', 'grow_specs*', [newDirectoryName,'/']);
 system(command);
 
 % create input and output directories
@@ -272,6 +272,7 @@ system('rm input');
 profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
+
 
 end
 
@@ -997,7 +998,7 @@ if done
     fid = fopen(spliced_profile_fileName,'w');
     
     % print first header line
-    fprintf(fid, 'fault segment_1 yes no yes\n');
+    fprintf(fid, 'fault segment_0 yes no yes\n');
     fprintf(fid, '*%s %s %s %s %s %s %s %s %s\n', ...
                              'Crack'                        , ...
                              'stiffS'                       , ...
@@ -1065,16 +1066,13 @@ if done
                 % of the fault
                 
                 fprintf(fid,'\n');
-                fprintf(fid,'segment_%i yes no no\n', crackCount);
+                fprintf(fid,'fault segment_%i yes no no\n', crackCount);
             end
-        else %if newX(n) == crackLocations
+        end
         
-        % print fault geometry to file
         fprintf(fid, ...
             '1 %f %f %f %f 0 1.00E+10 0 0 0 1 1 0\n', ...
             [X(n),  Y(n),  X(n+1),   Y(n+1)]');
-        
-        end
     end
     
     fprintf(fid,'\n');

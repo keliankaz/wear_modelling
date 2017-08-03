@@ -10,8 +10,8 @@ profileType =  'single_asperity';
 if strcmp(profileType,'single_asperity')
     
     asperityType = 'sine'; % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
-    absoluteAsperityLenght = 0.02; % width of the asperity in m
-    absoluteAsperityHeight = 0.0005; % height of the asperity in m
+    absoluteAsperityLenght = 0.04; % width of the asperity in m
+    absoluteAsperityHeight = 0.001; % height of the asperity in m
     padding   = 3; % padding on either side of the asperity that will just be flat (a factor of the asperityLength
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
