@@ -9,9 +9,9 @@ profileType =  'single_asperity';
 
 if strcmp(profileType,'single_asperity')
     
-    asperityType = 'sine'; % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
+    asperityType = 'triangle'; % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
     absoluteAsperityLenght = 0.04; % width of the asperity in m
-    absoluteAsperityHeight = 0.001; % height of the asperity in m
+    absoluteAsperityHeight = 0.01; % height of the asperity in m
     padding   = 3; % padding on either side of the asperity that will just be flat (a factor of the asperityLength
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -30,17 +30,20 @@ if strcmp(profileType,'single_asperity')
     
     elseif strcmp(asperityType, 'triangle') % bartlet window
         Y = [zeros(1,startInd), ...
-            window(@bartlet, numAsperityPts)'*absoluteAsperityHeight, ...
+            window(@bartlett, numAsperityPts)'*absoluteAsperityHeight, ...
             zeros(1,numPts-startInd-numAsperityPts)];
         
     elseif strcmp(asperityType, 'box') % tuckyWin
        Y = [zeros(1,startInd), ...
-                tukeywin(numAsperityPts,1)'*absoluteAsperityHeight, ...
+                tukeywin(numAsperityPts,0)'*absoluteAsperityHeight, ...
                 zeros(1,numPts-startInd-numAsperityPts)];
     
     elseif strcmp(asperityType, 'step') % step
        Y = [zeros(1,floor(numPts/2)), ...
               ones(1,ceil(numPts/2))*absoluteAsperityHeight];
+    elseif strcmp(asperityType, 'jog') % diagonal step
+       Y = [zeros(1,startInd), absoluteAsperityHeight/numAsperityPts*(1:numAsperityPts), ...
+           ones(1,numPts-startInd-numAsperityPts)*absoluteAsperityHeight];
     end
     
 elseif strcmp(profileType,'real_profile')

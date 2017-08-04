@@ -58,7 +58,7 @@ function [] = fric2D(fileName,X,Y)
 [X, Y] = checkinput(fileName, X,Y,nargin);
 
 %% 1) make input file
-[meanSegmentLength, newX] = makeinputfile(fileName,X,Y,inputParameters);
+[~, newX] = makeinputfile(fileName,X,Y,inputParameters);
 
 %% 2) run program 
 runfric2D(fileName);
@@ -75,7 +75,7 @@ outputStruct = extractoutput(fileName);
 % 5a)choose which crack(s) to grow (now set to 'all', could alternatively
 % be one of: 'all', 'tensile', 'shear', 'max coulomb', and 'max tensile')
 crackLocations = choosecracks(shearFailureCoord  , tensileFailureCoord  , ...
-                              inputParameters.user.cracks2grow, inputParameters)
+                              inputParameters.user.cracks2grow, inputParameters);
 
 if ~isempty(crackLocations)                           
 % 5b) run GROW with the chosen ckracks
@@ -83,7 +83,7 @@ if ~isempty(crackLocations)
 runGROW(newX, Y, crackLocations,inputParameters, GROWInputParameters);    
 
 %% 6) extract GROW output (not finished)
-% GROWOutputStruct = extractGROWoutput(GROWInputParameters.growFileName, crackLocations);
+GROWOutputStruct = extractGROWoutput(crackLocations, GROWInputParameters.growFileName, inputParameters);
 
 end
 
@@ -126,21 +126,30 @@ numPlots        = 4;
 subPlotCount    = 1;
 
 % a) geometry: (boundary box, fault, failure points)
-subplot(numPlots, 1, subPlotCount) 
+subplot(numPlots, 1, subPlotCount)
 subPlotCount = subPlotCount+1;
 hold on
 
-boundaryBox     = fill( outputStruct.boundaryLines.xBeg , ...
-                                   outputStruct.boundaryLines.yBeg , ...
-                        [0.8 0.8 0.8]);
+% plot the poundary box as a rectangle
+boundaryBox     = fill(             outputStruct.boundaryLines.xBeg , ...
+                                    outputStruct.boundaryLines.yBeg , ...
+                                    [0.8 0.8 0.8]);
+
+% plot the fault segments outputed from grow (if clause is within the function)                    
+plotGROWOutput('geometry')
+
+% superpose the fault geometry
 faultProfile                = plot( outputStruct.faultInfo.xBeg     , ...
-                                             outputStruct.faultInfo.yBeg     , ...
+                                   	outputStruct.faultInfo.yBeg     , ...
                                              '.-');
-leftEndBitLine           = plot( outputStruct.leftEndBit.xBeg, ...
-                                             outputStruct.leftEndBit.yBeg, 'r.-');
-rightEndBitLine         = plot( outputStruct.rightEndBit.xBeg, ...
-                                             outputStruct.rightEndBit.yBeg, 'r.-');
-                   
+                                         
+% plot endbits                                         
+leftEndBitLine          = plot(     outputStruct.leftEndBit.xBeg, ...
+                                    outputStruct.leftEndBit.yBeg, 'r.-');
+rightEndBitLine         = plot(     outputStruct.rightEndBit.xBeg, ...
+                                  	outputStruct.rightEndBit.yBeg, 'r.-');
+
+% plot the points that a subject to failure (local maxima)                                
 tensileFailurePoints    = scatter(tensileFailureCoord(:,1), tensileFailureCoord(:,2));
 shearFailurePoints      = scatter(shearFailureCoord(:,1), shearFailureCoord(:,2));
 
@@ -212,7 +221,46 @@ hLegendD        = legend([coulombPlot           , ...
                           ...
                           'coulomb failure criterion (\tau_m - (\sigma_m sin\phi+c cos\phi) > 0)', ...
                           'tensile failure criterion (\sigma_3 - c > 0)');
-    end
+
+        function plotGROWOutput(what2plot)
+            % plottting grow output
+            % input:
+            % what2plot: cell array, or string with thing to plot
+            %   'geometry': plot crack geometry
+            
+            
+            if strcmp(inputParameters.user.runGROWModel, 'yes') % no error meassage here because it should be issued in earlier functions
+                if ~strcmp(inputParameters.user.plotGROWModel, 'yes')
+                    if strcmp(inputParameters.user.plotGROWModel, 'no')
+                        disp('Grow output not plotted, change inputParameters.user.plotGROWModel to: ''yes''')
+                    else
+                        error('''plotGROWMOdel'' must be ''yes'' or ''no''')
+                    end
+                    return
+                end
+                
+                if any(strcmp(what2plot,'geometry'))
+                    hold on
+                    for iSegment = 1:(size(crackLocations,1)+1)
+                        
+                        xBeg = GROWOutputStruct.segments(iSegment).xbeg;
+                        yBeg = GROWOutputStruct.segments(iSegment).ybeg;
+                        xEnd = GROWOutputStruct.segments(iSegment).xend;
+                        yEnd = GROWOutputStruct.segments(iSegment).yend;
+                        
+                        dx = xEnd - xBeg;
+                        dy = yEnd - yBeg;
+                        
+                        segmentLine = quiver(xBed, yBeg, dx, dy);
+                        segmentLine.ShowArrowhead = 'no';
+                      
+                    end % for segments
+                else
+                    error('input to function plotGROWOutput must be one, or many, of ''geometry''')
+                end % if geomtry is called
+            end % if grow model is run
+        end % function to plot grow output
+    end % function to plot output
 
 % 8) organize files to reduce clutter in directory
     function organizefiles
@@ -228,7 +276,7 @@ end
 % move all file that start with 'fileName' into new directory
 command = sprintf('mv %s %s', [fileName,'.*'], [newDirectoryName,'/']);
 system(command);
-command = sprintf('mv %s %s', 'grow_specs.*', [newDirectoryName,'/']);
+command = sprintf('mv %s %s', 'grow_specs*', [newDirectoryName,'/']);
 system(command);
 
 % create input and output directories
@@ -273,6 +321,7 @@ profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
 
+
 end
 
 
@@ -300,8 +349,8 @@ function [inputParameters, GROWInputParameters] = userInput()
     inputParameters.boundaryConditions.shear       = -120;        % shear stress on faults  MPa
 
     % end bits
-    inputParameters.boundaryConditions.BVSTop      = -0.0000445;  % displacement on left end bit (m)
-    inputParameters.boundaryConditions.BVSBot      = -0.000215;   % displacement on right end bit (m) 
+    inputParameters.boundaryConditions.BVSTop      = -0.00005;  % displacement on left end bit (m)
+    inputParameters.boundaryConditions.BVSBot      = -0.0003;   % displacement on right end bit (m) 
 
     % user choices
 
@@ -314,7 +363,7 @@ function [inputParameters, GROWInputParameters] = userInput()
                                                                  % 'max tensile'    most tensile crack
                                                                  % 'max coulomb'      most sheared crack                                                            
     inputParameters.user.runGROWModel              = 'yes' ;     % run grow ('yes' or 'no')
-    
+    inputParameters.user.plotGROWModel             = 'yes' ;     % plot grow output 'yes' or 'no' (make sure runGROWmodel is set to yes as well)
     
     % GROW inputs
     
@@ -334,7 +383,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     fault_flaw.tag          = 'Flaw-Fault'; % tag
     fault_flaw.stiffS       = 10^10;        % shear stiffness
     fault_flaw.stiffN       = 10^10;        % normal stiffness
-    fault_flaw.T            = 1;            % Tensional strenght
+    fault_flaw.T            = 10;            % Tensional strenght
     fault_flaw.S_0          = 1;            % Internal shear strength
     fault_flaw.cohes        = 0;            % sliding cohesion
     fault_flaw.friction_s   = 0.6;          % static friction
@@ -444,13 +493,13 @@ make_end_bits(X,Y, numBufferSegments, BVSTop, BVSBot);
 % make the length of the end bit a function of the profile length
 
 % add tag line for the first fault
-fault_header_fileName = 
-fid=fopen(fault_header.txt,'w');
+fault_header_fileName = 'fault_header.txt';
+fid=fopen(fault_header_fileName,'w');
 fprintf(fid, 'fault segment_0 yes no no\n');
 fclose(fid);
 
 % concatenate to the input file
-command = sprintf('cat %s %s %s > %s', input_section_fileName, fault profileName, 'end_bits.txt', [fileName, '.in']);
+command = sprintf('cat %s %s %s %s > %s', input_section_fileName, fault_header_fileName, profileName, 'end_bits.txt', [fileName, '.in']);
 system(command);
 
 % more options...
@@ -781,7 +830,7 @@ for iBE = 1:numBE
     tau_m       = (sigma1-sigma3)/2;
     sigma_m     = (sigma1+sigma3)/2;
     
-    coulombCriterion(iBE) = tau_m - (sigma_m*sind(phi)+c*cosd(phi));
+    coulombCriterion(iBE) = -tau_m + (sigma_m*sind(phi)+c*cosd(phi));
     tensileCriterion(iBE) = -sigma3-c;
  
 end
@@ -849,21 +898,7 @@ end
 
 end
 
-
-
-%% 6) extract Grow output (being  built)
-
-%% 7) visually diaplay output information (function is located in embeded function section)
-
-%% 8) Organize files (function is located in embeded function section)
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% --------------------- Being built ---------------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% 5b) use outputs from fric2D and failure asseessment to track fracture growth
-%function [] = runGROW(fileName,crackLocations, BELength, inputParameters, GROWInputParameters)
 function [] = runGROW(X, Y, crackLocations, inputParameters, GROWInputParameters)
 % this function runs GROW (GROwth by Work-minimization)
 
@@ -888,86 +923,6 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 
 end
-
-% tempFile = 'grow_temp';
-% fid=fopen(tempFile,'w');
-% 
-% for iFlaw = 1:length(intact_flaw.xcoord)
-% 
-% growInputSpecL1 = '*%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n';                            
-% fprintf(fid,growInputSpecL1, ...
-%                                 'Tag', ...
-%                                 'fault', ...
-%                                 'xcoor', ...
-%                                 'ycoor', ...
-%                                 'length', ...
-%                                 'grow_both?', ...
-%                                 'stiffS', ...
-%                                 'stiffN', ...
-%                                 'T', ...
-%                                 'S_0', ...
-%                                 'cohes', ...
-%                                 'friction-s', ...
-%                                 'friction-d', ...
-%                                 'L');
-% 
-% growInputSpecL2 = '*%s %f %f %f %f %f %f \n';
-% fprintf(fid,growInputSpecL2, ...
-%                                 fault_flaw.tag              , ...
-%                                 fault_flaw.stiffS           , ...
-%                                 fault_flaw.stiffN           , ...
-%                                 fault_flaw.cohes            , ...
-%                                 fault_flaw.friction_s       , ...
-%                                 fault_flaw.friction_d       , ...
-%                                 fault_flaw.L                );
-%                            
-% 
-% growInputSpecL4 = '*%s %s %f %f %f %s %f %f %f %f %f %f %f %f\n\n';
-% fprintf(fid,growInputSpecL4, ...
-%                                 intact_flaw.Tag             , ...
-%                                 [intact_flaw.fault,num2str(iFlaw)], ...
-%                                 intact_flaw.xcoord(iFlaw)   , ...
-%                                 intact_flaw.ycoord(iFlaw)   , ...
-%                                 intact_flaw.length          , ...
-%                                 intact_flaw.grow_both       , ...
-%                                 intact_flaw.stiffS          , ...
-%                                 intact_flaw.stiffN          , ...
-%                                 intact_flaw.T               , ...
-%                                 intact_flaw.S_0             , ...
-%                                 intact_flaw.cohesion        , ...    
-%                                 intact_flaw.friction_s      , ...    
-%                                 intact_flaw.friction_d      , ...
-%                                 intact_flaw.L               );
-% 
-% end
-% 
-% fclose(fid);
-% 
-% profileName                 = [fileName,'_profile.txt'];
-% command = sprintf('cat %s %s %s %s > %s', ...
-%                     'input'                                         , ... 
-%                     profileName                                     , ...
-%                     tempFile                                        , ...
-%                     'end_bits.txt'                                  , ...
-%                     GROWInputParameters.growFileName                );
-%                 
-% system(command);
-% 
-% command = sprintf('rm %s', tempFile);
-% system(command);
-% 
-% command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
-%                                 GROWInputParameters.growFileName  	, ...
-%                                 GROWInputParameters.angleResolution , ...
-%                                 GROWInputParameters.startAngle    	, ...
-%                                 GROWInputParameters.endAngle    	);
-%                             
-% system(command);
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%% completely different approach %%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % split fault into two and add *Crack tag to the on of the fauts. One of
 % the faults will be allowed to grow from one of its ends
@@ -997,9 +952,9 @@ if done
     fid = fopen(spliced_profile_fileName,'w');
     
     % print first header line
-    fprintf(fid, 'fault segment_1 yes no yes\n');
+    fprintf(fid, 'fault segment_0 yes no yes\n');
     fprintf(fid, '*%s %s %s %s %s %s %s %s %s\n', ...
-                             'Crack'                        , ...
+                             'Tag'                        , ...
                              'stiffS'                       , ...
                              'stiffN'                       , ...
                              'T'                            , ...
@@ -1009,7 +964,7 @@ if done
                              'friction-d'                   , ...
                              'L'                            );
                          
-                fprintf(fid, '*%f %f %f %f %f %f %f %f %f\n', ...
+                fprintf(fid, '*%s %f %f %f %f %f %f %f %f\n', ...
                                 'Crack'                     , ...
                                 fault_flaw.stiffS           , ...
                                 fault_flaw.stiffN           , ...
@@ -1065,16 +1020,13 @@ if done
                 % of the fault
                 
                 fprintf(fid,'\n');
-                fprintf(fid,'segment_%i yes no no\n', crackCount);
+                fprintf(fid,'fault segment_%i yes no no\n', crackCount);
             end
-        else %if newX(n) == crackLocations
+        end
         
-        % print fault geometry to file
         fprintf(fid, ...
             '1 %f %f %f %f 0 1.00E+10 0 0 0 1 1 0\n', ...
             [X(n),  Y(n),  X(n+1),   Y(n+1)]');
-        
-        end
     end
     
     fprintf(fid,'\n');
@@ -1113,9 +1065,8 @@ end
 
 end
 
-%% extract Grow output
-
-function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
+%% 6) extract Grow output 
+function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName, inputParameters)
 
 % extracts numeric blocks of information out of GROW output file and saves
 % them into matlab structure with fields names corresponding (sometimes
@@ -1128,7 +1079,13 @@ function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
 % state does not extract 'end bits' % information.
 
 % output:
-% structure with with fields corresponding to blocks of data:
+% GROWOutputStruct: structure with with fields corresponding to blocks of data
+%   segments: 1 by N (N is numuber of fault segments, or, equivalently, the
+%   number of defects+1) structure with fields corresponding to .eff
+%   headers for the crack information (num    xbeg    ybeg    xend    yend
+%   stiffS stiffN ten_str init_coh slid_coh stat_fric dy_fric crit_slip)
+% 
+% POSSIBLY MORE COMING...
 
 % function calls:
 % read_blocks_of_numeric_data
@@ -1142,7 +1099,7 @@ function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
 
 
 % check if this function should be run:
-if strcmp(inputParameters.user.runGROWModel, 'yes')
+if ~strcmp(inputParameters.user.runGROWModel, 'yes')
     if strcmp(inputParameters.user.runGROWModel, 'no')
         disp('No GROW Model was lauched, change ''inputParameters.user.runGROWModel'' input to ''yes'' if so desired')
     else 
@@ -1151,18 +1108,23 @@ if strcmp(inputParameters.user.runGROWModel, 'yes')
     return
 end
         
-outputFileName = [growFileName,'.out'];
+outputFileName = [growFileName,'.eff'];
 
 % load in block of data (TERRIBLE IDEA BUT FUCK IT): 
 
 % determine howmany cracks where grown
 crackLocDim = size(crackLoc);
 numCracks = crackLocDim(1);
-blocksPerCrack = 1; % make sure this is correct
-expectedFric2dDataBlocks = 4; % this is here to make sure that I'm not fucking up the parsing of the output
-expectedDataBlocks = expectedFric2dDataBlocks + blocksPerCrack*numCrack;
+crackBlocks = numCracks+1; % make sure this is correct
+boundaryBlocks = 1;
+endBitBlocks = 2;
+expectedFric2dDataBlocks = boundaryBlocks+endBitBlocks; % this is here to make sure that I'm not fucking up the parsing of the output
 
-dataBlocks = read_blocks_of_numerical_data(outputFileName, 1000);
+
+expectedDataBlocks = expectedFric2dDataBlocks + crackBlocks;
+
+% extracts blocks of numeric data
+dataBlocks = read_blocks_of_numerical_data(outputFileName, 10,' |\t'); % 10 is the minimum length of string
 numBlocks  = length(dataBlocks);
 
 % double checking that the number of blocks is right
@@ -1171,23 +1133,58 @@ if numBlocks ~= expectedDataBlocks
 end
 
 % Get crack info:
-for iCrack = 1:numCrack
-   % exctract data for each crack
-   
-   % steps:
-% define headers (what will they be?)
+numSegments = numCracks+1;
 
-% get block of data
-% get the geometry
+% initialize structure
+segmentHeaders = {  'num'               , ...
+                    'xbeg'              , ...
+                    'ybeg'              , ...
+                    'xend'              , ...
+                    'yend'              , ...
+                    'stiffS'            , ...
+                    'stiffN'            , ...
+                    'tens_str'          , ...
+                    'init_coh'          , ...
+                    'stat_fric'         , ...
+                    'dy_fric'           , ...
+                    'crit_slip'         };
+blankData = zeros(1,length(segmentHeaders));
+segmentStruct = assign2struct(blankData,segmentHeaders);
+segmentStruct(numSegments).(segmentHeaders{1}) = 0;         
 
-% What I need to do here:
-% figure out how many blocks of data will be produced from GROW
-
-% for now the key blocks of data that I want are the crack geometry
-% need to know what the header sections will be as well
-end % for iCrack = 1:numCrack
+for iSegment = 1:numSegments
+    % exctract data for each crack
     
-end % function GROWOutputStruct = extractGROWoutput(crackLoc, growFileName)
+    % steps:
+    % define headers (what will they be?)
+    
+    % get block of data
+    % get the geometry
+    
+    % What I need to do here:
+    % figure out how many blocks of data will be produced from GROW
+    
+    % for now the key blocks of data that I want are the crack geometry
+    % need to know what the header sections will be as well
+    
+    segmentBlock = dataBlocks(boundaryBlocks+iSegment);
+    segmentStruct(iSegment) = assign2struct(segmentBlock{:},segmentHeaders);
+
+end % for iCrack = 1:numCrack
+
+% output is stroredin mater structure 
+% not that for now this is a bit odd,m but I am leave the possibility for
+% extracting other fields from the efficient file (or others, for that
+% matter)
+GROWOutputStruct = [];
+GROWOutputStruct.segments = segmentStruct; 
+    
+end 
+
+%% 7) visually diaplay output information (function is located in embeded function section)
+
+%% 8) Organize files (function is located in embeded function section)
+
 
 
 

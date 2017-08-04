@@ -1,0 +1,1 @@
+fault segment_0 yes no no
