@@ -27,9 +27,7 @@ If a model ran to completion the output will be stored in a directory named 'out
 
 ## Authors
 
-**Kelian Dascher-Cousineau**
-**Michele Cooke**
-**Jess Mecbeth**
+**Kelian Dascher-Cousineau** workflow, **Michele Cooke** - Fric2d, **Jess Mecbeth** GROW
 
 ## License
 
