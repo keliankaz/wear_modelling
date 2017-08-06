@@ -4,13 +4,13 @@ Geomechanical boundary element modelling of the behavor of 2 dimensional profile
 
 ## Getting Started
 
-Dowload a copy of the master branch and unzip
-Open matlab
+Dowload a copy of the master branch and unzip it in desired directory. Open matlab (2016a or later).
 
 ### Prerequisites
 
+UNIX or MAC system. Does not work with windows systems.
 Matlab 2016a or later (https://www.mathworks.com/)
-Perl
+Perl (should be installed on all UNIX or MAC systems)
 
 ### Installing
 
