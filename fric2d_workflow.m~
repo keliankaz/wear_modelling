@@ -1,4 +1,4 @@
-function [] = fric2D(fileName,X,Y)
+function [] = fric2d_workflow(fileName,X,Y)
 % Automated General work flow for the fric2d software 
 
 % INPUT:
@@ -128,6 +128,8 @@ fric2dFig = figure;
 numPlots        = 4;
 subPlotCount    = 1;
 
+title(sprintf('%s', fileName)) 
+
 % a) geometry: (boundary box, fault, failure points)
 subplot(numPlots, 1, subPlotCount)
 subPlotCount = subPlotCount+1;
@@ -172,16 +174,23 @@ set( gca                                        , ...
      'Box'          , 'off'                     , ...
      'FontName'     , 'Helvetica'               );
 axis equal
-     
+xlabel('x (m)')     
+
 % b) displacmement (shear, normal)
 subplot(numPlots, 1, subPlotCount) 
 subPlotCount = subPlotCount+1;
-hold on  
+hold on 
 
+yyaxis left
 shearDisplacementPlot   = plot(outputStruct.faultInfo.xBeg, ...
-                               outputStruct.faultStress.DS);                     
+                               outputStruct.faultStress.DS);
+ylabel('Shear Displacement (m)')
+                           
+yyaxis right
 normalDisplacementPlot  = plot(outputStruct.faultInfo.xBeg, ...
                                outputStruct.faultStress.DN);
+ylabel('Normal Displacement (m)')
+xlabel('x (m)')
                            
 hLegendB        = legend([shearDisplacementPlot , ...
                           normalDisplacementPlot],...
@@ -209,7 +218,7 @@ hLegendC        = legend([shearStressPlot       , ...
                           'Shear Stress'        , ...
                           'Normal Stress'       , ...
                           'Tangential Stress'   );
-
+xlabel('x (m)')
 % d) failure criterion (coulomb, tensile)
 subplot(numPlots, 1, subPlotCount) 
 subPlotCount = subPlotCount+1;
@@ -224,7 +233,7 @@ hLegendD        = legend([coulombPlot           , ...
                           ...
                           'coulomb failure criterion (\tau_m - (\sigma_m sin\phi+c cos\phi) > 0)', ...
                           'tensile failure criterion (\sigma_3 - c > 0)');
-
+xlabel('x (m)')
         function plotGROWOutput(what2plot)
             % plottting grow output
             % input:
@@ -478,9 +487,27 @@ checkFile(GROWInputParameters.GROW_perl_fileName);
 checkFile('simple_shear_bc.pl');
 checkFile('Wext.pl');
 
-% compile fric2d if hasnt been
-if exist('fric2d', 'file') ~= 2
+% compile fric2d if hasnt been done so already and move file into working
+% directory
+if (exist('fric2d', 'file') == 0)
     
+    % IMPORTANT: if fric
+    path2fric2dCompiler = 'GROW/fric2d_source_code';
+    
+    disp('fric2d is not in the working directory, we will try to take care of it...')
+
+    currentFolder = pwd;
+    
+    try %to compile fric 2d
+    cd(path2fric2dCompiler);
+    system('make');
+    cd(currentFolder);
+    system(['cp ', path2fric2dCompiler, '/fric2d fric2d']);
+    disp('got it')
+    catch
+        error(['the fric2d executable is not in working directory, a compiler was not found in the following directory: ', ...
+               path2fric2dCompiler]);
+    end
 end
 
     function checkFile(fileName)
@@ -661,9 +688,6 @@ end
 
 %% 2) run fric2D
 function runfric2D(fileName)
-% command = ['fric2d_3.2.8 -i ', ...
-%            fileName,'.in -v -o ', fileName,'.out'];
-% system(command);
 
 command = ['./fric2d -i ', ...
            fileName,'.in -v -o ', fileName,'.out'];

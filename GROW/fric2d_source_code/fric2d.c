@@ -1,5 +1,5 @@
 #define PROGRAM fric2d.c			/* Info for output/resume files		*/
-#define VERSION 3.2.7				/*		"			*/
+#define VERSION 3.2.8				/*		"			*/
 #define REVISE_DATE April 2014			/*		"			*/
 
 
@@ -49,7 +49,9 @@
 * Apr 14	3.2.6 fixed reporting of opening failure		MLC
 * Apr 14	3.2.7 Shear failure if the normal stress is greater 
 * 		than shear strength divided by friction			MLC
-*				 
+* Dec 14	3.2.8 Fix issue with fracture propagation		MLC
+* Nov 16	3.2.8 Fixed trangential stress for non-planar faults    MLC
+*   			 
 * Known compiler warnings but code should still run ok: 
 *getoption.c: In function ‘add_arg’:
 *
@@ -77,9 +79,9 @@
 #define ISECT -1				/* tip intersected flag			*/
 #define ISECTTXT "intersected"			/* tip intersected flag in input file	*/
 #define MAXELTS 5000				/* max # of BE's (boundaries & fracs)	*/
-#define MAXFILE 50				/* max length of file names		*/
-#define MAXFNAME 50				/* max length of fracture/fault name		*/
-#define MAXLINE 120				/* max length of an input line		*/
+#define MAXFILE 200				/* max length of file names		*/
+#define MAXFNAME 50				/* max length of fracture/fault name	*/
+#define MAXLINE 220				/* max length of an input line		*/
 #define MAXWORDS 20				/* max # of words on an input line	*/
 #define MAXTITLE 80				/* max length of problem titles		*/
 #define PROPYESTXT "yes"			/* allow tip prop flag in input file	*/
@@ -609,11 +611,13 @@ void grow_fracs(FILE *ofp, int *prop_possible)
 			}
 			else {
  
-				if (first_tip == (j==0))
+				if (j==0){
 					tipelt = current_frac->first_seg->start_elt;
-				else
+					first_tip = 1;
+				}else{
 					tipelt = current_frac->last_seg->end_elt;
-	
+					first_tip =0;
+				}	
 				failure = propagation(ofp, tipelt, &pangle);
  
 				if (failure >= 1.0) {
@@ -743,26 +747,45 @@ double  propagation(FILE *ofp, int tipelt, double *pangle)
 double  fail(FILE *ofp, int tipelt, int top, double *pangle)
 {
 	double	unneg, usneg,unpos, uspos, sign, sigs;
-	double	leftU, rightU;
+	double	leftUs, rightUs, leftUn, rightUn,uxs, uxn;
 	double  gradient, tangent;
 	double	diff, maxPrinc, failure;
 	
-	/* Find shear displacements to the left of the element in question */
+	/* Find shear and normal displacements to the left of the element in question */
 	calc_BE_BCs(tipelt-1,&usneg,&unneg,&uspos,&unpos,&sigs,&sign);
-	leftU = (top) ? uspos : usneg;
+	leftUs = (top) ? uspos : usneg;
+	leftUn = (top) ? unpos : unneg;
 	
-	/* Find shear displacements to the right of the element in question */
+	/* Find shear and normal displacements to the right of the element in question */
 	calc_BE_BCs(tipelt+1,&usneg,&unneg,&uspos,&unpos,&sigs,&sign);
-	rightU = (top) ? uspos : usneg;
+	rightUs = (top) ? uspos : usneg;
+	rightUn = (top) ? unpos : unpos;
 	
 	calc_BE_BCs(tipelt,&usneg,&unneg,&uspos,&unpos,&sigs,&sign);
 		
-	/* find slip gradient using center method */
-	gradient=(rightU-leftU)/(a[tipelt+1]+2*a[tipelt]+a[tipelt-1]);
+	/* find slip gradient using center method.
+	BUT need to consider the displacements into a common reference frame of the
+	center element.	This is important if the fault is not planar. */
+
+		/*First just converting to horizontal reference frame. Note: this is a clockwise
+		  rotation so the transformatiob matrix is transposed. */
+		uxs = cosbet[tipelt-1] * leftUs - sinbet[tipelt-1]*leftUn;
+                uxn = +sinbet[tipelt-1] * leftUs + cosbet[tipelt-1]*leftUn;
+		/*convert left to element reference frame*/
+		leftUs = cosbet[tipelt] * uxs + sinbet[tipelt]*uxn;
+
+		/*First just converting to horizontal reference frame. Note: this is a clockwise
+                rotation so the transformatiob matrix is transposed. */
+                uxs = cosbet[tipelt+1] * rightUs - sinbet[tipelt+1]*rightUn;
+                uxn = +sinbet[tipelt+1] * rightUs + cosbet[tipelt+1]*rightUn;
+                /*convert left to element reference frame*/
+                rightUs = cosbet[tipelt] * uxs + sinbet[tipelt]*uxn;
+
+	gradient=(rightUs-leftUs)/(a[tipelt+1]+2*a[tipelt]+a[tipelt-1]);
 	
 
 	/* The tangent is gradient component and influence of sign
-		in this case sign alrady includes necessary gravity 
+		in this case sign already includes necessary gravity 
 		effects.  They are added in calc_Bes */
 	tangent = e/(1-pr*pr) * gradient + pr/(1-pr)*sign;
 
@@ -774,7 +797,7 @@ double  fail(FILE *ofp, int tipelt, int top, double *pangle)
 	/*Determine angle*/
 	*pangle = 0.5 * atan2( 2*sigs, diff) + M_PI/2;
 	
- 	VFPRINTF(ofp,"    %f     %f    %7.1f  ", tangent, maxPrinc, *pangle*180/M_PI);
+ 	VFPRINTF(ofp,"    %f   %f    %7.1f  ", tangent, maxPrinc, *pangle*180/M_PI);
 	
 	return failure;
 }
@@ -890,7 +913,7 @@ void findSlipped(FILE *ofp, int *prop_possible2)
 		current_fault = current_fault->next;
 	}/*for*/
 
-        /* Print if the element failed in tension */ 
+        /* Print if the element failed in tension */
         fprintf(ofp,"\n\nThe following frictional elements opened in this loading step:\n");
 
         current_fault = first_fault;
@@ -1044,7 +1067,7 @@ void faultSlip(FILE *ofp, int *contin)
 
 		/* OPTION 1: if the normal stresses are tensile... */
 		if ( sign >= epsilon + faultTen[i]) {
-			/*printf("\n Fault element %d failed in tension ", n);*/
+			printf("\n Fault element %d failed in tension ", n);
 			faultTen[i] = 0.0;
 			b[2*n-1] = sheargrav;
 			b[2*n] = normgrav;
@@ -1744,7 +1767,7 @@ print_prob_info(FILE *ofp)
 	int i;
 
 
-	fprintf(ofp,"This file was created with Fric2D version 3.2.7 - revision date April 2014 \n");	
+	fprintf(ofp,"This file was created with Fric2D version 3.2.8 - revision date Dec 2014 \n");	
 	fprintf(ofp,"\nTITLE1: %s\n", title1);
 	fprintf(ofp,"TITLE2: %s\n\n", title2);
  

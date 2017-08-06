@@ -87,7 +87,7 @@ fileName = sprintf('%s_%s_%s_%s_run%i',generalRunName, profileType, asperityType
                 
 % run the work flow
 tic
-fric2D(fileName,X,Y)
+fric2d_workflow(fileName,X,Y)
 runTime = toc;
 sprintf('run time was: %f seconds', runTime)
 end

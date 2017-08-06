@@ -1,4 +1,4 @@
-function [] = fric2D(fileName,X,Y)
+function [] = fric2d_workflow(fileName,X,Y)
 % Automated General work flow for the fric2d software 
 
 % INPUT:
@@ -174,7 +174,9 @@ set( gca                                        , ...
      'Box'          , 'off'                     , ...
      'FontName'     , 'Helvetica'               );
 axis equal
-xlabel('x (m)')     
+xlabel('x (m)')
+ylabel('y (m)')
+
 
 % b) displacmement (shear, normal)
 subplot(numPlots, 1, subPlotCount) 
@@ -219,6 +221,8 @@ hLegendC        = legend([shearStressPlot       , ...
                           'Normal Stress'       , ...
                           'Tangential Stress'   );
 xlabel('x (m)')
+ylabel('(MPa)')
+
 % d) failure criterion (coulomb, tensile)
 subplot(numPlots, 1, subPlotCount) 
 subPlotCount = subPlotCount+1;
@@ -234,6 +238,7 @@ hLegendD        = legend([coulombPlot           , ...
                           'coulomb failure criterion (\tau_m - (\sigma_m sin\phi+c cos\phi) > 0)', ...
                           'tensile failure criterion (\sigma_3 - c > 0)');
 xlabel('x (m)')
+ylabel('(MPa)')
         function plotGROWOutput(what2plot)
             % plottting grow output
             % input:
@@ -491,15 +496,18 @@ checkFile('Wext.pl');
 % directory
 if (exist('fric2d', 'file') == 0)
     
+    % IMPORTANT: if fric
+    path2fric2dCompiler = 'GROW/fric2d_source_code';
+    
     disp('fric2d is not in the working directory, we will try to take care of it...')
-    path2fric2dCompiler = 'GROW/fric2d_soure_code';
+
     currentFolder = pwd;
     
     try %to compile fric 2d
-    cd(path2fric2dCompiler)
-    !make
-    cd(currentFolder)
-    system(['cp ', path2fric2dCompiler, '/fric2d fric2d'])
+    cd(path2fric2dCompiler);
+    system('make');
+    cd(currentFolder);
+    system(['cp ', path2fric2dCompiler, '/fric2d fric2d']);
     disp('got it')
     catch
         error(['the fric2d executable is not in working directory, a compiler was not found in the following directory: ', ...
@@ -685,9 +693,6 @@ end
 
 %% 2) run fric2D
 function runfric2D(fileName)
-% command = ['fric2d_3.2.8 -i ', ...
-%            fileName,'.in -v -o ', fileName,'.out'];
-% system(command);
 
 command = ['./fric2d -i ', ...
            fileName,'.in -v -o ', fileName,'.out'];
