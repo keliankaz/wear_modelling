@@ -56,6 +56,9 @@ function [] = fric2D(fileName,X,Y)
 
 % *check Input*:
 [X, Y] = checkinput(fileName, X,Y,nargin);
+% *check Directory*
+
+check_directory(GROWInputParameters)
 
 %% 1) make input file
 [~, newX] = makeinputfile(fileName,X,Y,inputParameters);
@@ -312,22 +315,21 @@ command = sprintf('mv %s %s', [newDirectoryName,'/*.eff'], [newDirectoryName,'/e
 system(command);
 command = sprintf('mv %s %s', [newDirectoryName,'/*.prev'], [newDirectoryName,'/prev']);
 system(command);
-
-profileName                 = [fileName,'_profile.txt'];
-command = sprintf('mv %s %s', [newDirectoryName,'/*.prev'], [newDirectoryName,'/prev']);
-system(command);
+ 
+% save matlab content including output figure and input specs
+savefig([newDirectoryName,'/',fileName]);
+save([newDirectoryName,'/',fileName], 'inputParameters', 'GROWInputParameters');
 
 system('rm end_bits.txt');
 system('rm input');
+system('rm spliced_profile_temp.txt');
+system('rm fault_header.txt')
 profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
 
 
 end
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ------------------- User Input --------------------------------------------
@@ -336,24 +338,35 @@ end
 function [inputParameters, GROWInputParameters] = userInput()
     inputParameters = [];
 
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % THIS IS LIKELY THE ONLY SECTION A USER MAY WANT TO CHANGE %%%%%%%%%%%
     % material parameters:
-
-    inputParameters.material.E                     = 30000;     % Young's Modulus MPa
-    inputParameters.material.nu                    = 0.25;      % Poisson's ratio
-
-    inputParameters.material.c                     = 5;         % cohesion (MPa)
-    inputParameters.material.phi                   = 20;        % angle of intenral friction  (degrees)
-
+    
+    E                       = 3000;     % Young's Modulus MPa
+    nu                      = 0.25;     % Poisson's ratio
+    T                       = 10;       % Tensile strength of the host rock (MPa)
+    S_0                     = 5;        % Shear strength of the host rock (MPa)
+    static_friction         = 0.6;      % static friction of crack elements
+    dynamic_friction        = 0;        % dynamic friction of crack elements
+    critical_slip_distance  = 10^-5;    % critical slip distance (m)
+    shear_stiffness         = 10^10;    % shear stiffness 
+    normal_stiffness        = 10^10;    % normal stiffness
+    sliding_cohesion        = 0;        % sliding cohesion (resistance of fault elements to tension)
+    
     % boundary conditions
-
-    inputParameters.boundaryConditions.sigxx       = -80;       % normal stress parallel to faults MPa
-    inputParameters.boundaryConditions.sigyy       = -80;       % normal stress perpendicular to faults MPa
-    inputParameters.boundaryConditions.shear       = -120;        % shear stress on faults  MPa
-
-    % end bits
-    inputParameters.boundaryConditions.BVSTop      = -0.00005;  % displacement on left end bit (m)
-    inputParameters.boundaryConditions.BVSBot      = -0.0003;   % displacement on right end bit (m) 
-
+    
+    lithostatic_stress      = -80;
+    shear_stress            = -60;
+    
+    left_loading            = -0.0002;  % displacement on left end bit (m)
+    right_loading           = -0.00115;   % displacement on right end bit (m) 
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % MORE TECHNICAL CHANGES:
+    
     % user choices
 
     inputParameters.user.showFric2DOutput          = 'yes';     % plot output from fric2d ('yes' or 'no')
@@ -374,45 +387,49 @@ function [inputParameters, GROWInputParameters] = userInput()
     GROWInputParameters.growFileName = 'grow_specs';
     
     % grow input  parameters parameter
+   
+    % this will be part of the command to run GROW 
+    GROWInputParameters.angleResolution         = 10;
+    GROWInputParameters.startAngle              = 100;
+    GROWInputParameters.endAngle                = 260;
     
-    % this will be part of the command to run GROW
-    GROWInputParameters.angleResolution         = 45;
-    GROWInputParameters.startAngle              = 45;
-    GROWInputParameters.endAngle                = 315;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % STORING INPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    inputParameters.material.E                     = E;                     % Young's Modulus MPa
+    inputParameters.material.nu                    = nu;                    % Poisson's ratio
+
+    inputParameters.material.c                     = T;                     % cohesion (MPa)
+    inputParameters.material.phi                   = atand(static_friction); % angle of intenral friction  (degrees)
+
+    % boundary conditions
+
+    inputParameters.boundaryConditions.sigxx       = lithostatic_stress;   	% normal stress parallel to faults MPa
+    inputParameters.boundaryConditions.sigyy       = lithostatic_stress;    % normal stress perpendicular to faults MPa
+    inputParameters.boundaryConditions.shear       = shear_stress;          % shear stress on faults  MPa
+
+    % end bits
+    inputParameters.boundaryConditions.BVSTop      = left_loading;  % displacement on left end bit (m)
+    inputParameters.boundaryConditions.BVSBot      = right_loading;   % displacement on right end bit (m) 
+
     
     % parameters tacked on to input file
     fault_flaw              = [];
-    fault_flaw.tag          = 'Flaw-Fault'; % tag
-    fault_flaw.stiffS       = 10^10;        % shear stiffness
-    fault_flaw.stiffN       = 10^10;        % normal stiffness
-    fault_flaw.T            = 10;            % Tensional strenght
-    fault_flaw.S_0          = 1;            % Internal shear strength
-    fault_flaw.cohes        = 0;            % sliding cohesion
-    fault_flaw.friction_s   = 0.6;          % static friction
-    fault_flaw.friction_d   = 0.0;          % dynamic friction
-    fault_flaw.L            = 10^-5;        % critical sliding distance
-    
-    
-    intact_flaw             = [];
-    intact_flaw.Tag         = 'Flaw-intact';
-    intact_flaw.fault       = 'crittical_point';    
-    intact_flaw.grow_both   = 'yes';
-    intact_flaw.stiffS      = 0;
-    intact_flaw.stiffN      = 10^10;
-    intact_flaw.T           = 5;
-    intact_flaw.S_0         = 50;
-    intact_flaw.cohesion    = 0;
-    intact_flaw.friction_s  = 0.6;
-    intact_flaw.friction_d  = 0.0;
-    intact_flaw.L           = 10^-5;
+    fault_flaw.stiffS       = shear_stiffness;          % shear stiffness
+    fault_flaw.stiffN       = normal_stiffness;         % normal stiffness
+    fault_flaw.T            = T;                        % Tensional strenght
+    fault_flaw.S_0          = S_0;                      % Internal shear strength
+    fault_flaw.cohes        = sliding_cohesion;       	% sliding cohesion
+    fault_flaw.friction_s   = static_friction;          % static friction
+    fault_flaw.friction_d   = dynamic_friction;       	% dynamic friction
+    fault_flaw.L            = critical_slip_distance; 	% critical sliding distance
     
     GROWInputParameters.fault_flaw = fault_flaw;
-    GROWInputParameters.intact_flaw = intact_flaw;
     
+    % software:
+    GROWInputParameters.GROW_perl_fileName = 'GROW_nov_17_15.pl';
 end
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ------------------- section functions ----------------------------------
@@ -449,7 +466,33 @@ function [X,Y] = checkinput(fileName, X,Y, numInput)
             Y = Y';
          end
          
+end
+
+% check whether necessary files are in folder:
+
+function check_directory(GROWInputParameters)
+
+% check directory
+
+checkFile(GROWInputParameters.GROW_perl_fileName);
+checkFile('simple_shear_bc.pl');
+checkFile('Wext.pl');
+
+% compile fric2d if hasnt been
+if exist('fric2d', 'file') ~= 2
+    
+end
+
+    function checkFile(fileName)
+        
+        if exist(fileName, 'file') ~= 2
+            errorMessage = [fileName, ' is not in directory, you need it to be'];
+            error(errorMessage)
+        end  
     end
+
+
+end
 
 %% 1) make the input file for the fric2D program
 function [meanSegmentLength, X] = makeinputfile(fileName,X,Y, inputParameters)
@@ -458,7 +501,7 @@ function [meanSegmentLength, X] = makeinputfile(fileName,X,Y, inputParameters)
 profileName                 = [fileName,'_profile.txt']; % dont change this same name used in 6b
 
 padding = 2;
-boxAspectRatio = 0.2;
+boxAspectRatio = 0.3; % height to length ratio of the boundary box
 
 [X, meanSegmentLength,boxSize] = makeprofile(profileName,X,Y,padding, boxAspectRatio);
 
@@ -490,7 +533,7 @@ BVSBot      = inputParameters.boundaryConditions.BVSBot;
 % calculate number of endbit segments on either side of input fault
 % geometry (magic number 4 is used to calulate half the distance from the
 % tip of the fault geometry to the end  side of the box)
-numBufferSegments = floor(boxSize(1)/(padding(1)*4*meanSegmentLength));
+numBufferSegments = floor(boxSize(1)/(padding*4*meanSegmentLength));
 make_end_bits(X,Y, numBufferSegments, BVSTop, BVSBot);
 % make the length of the end bit a function of the profile length
 
@@ -527,7 +570,7 @@ RX = range(X);
 RY = range(Y);
 
 MEAN_SEGMENT_LENGTH = mean(sqrt((X(2:end)-X(1:(end-1))).^2 +(Y(2:end)-Y(1:(end-1))).^2));
-MEAN_SEGMENT_LENGTH = round(MEAN_SEGMENT_LENGTH,1,'significant');
+MEAN_SEGMENT_LENGTH = round(MEAN_SEGMENT_LENGTH,2,'significant');
 
 % boxSize = padding.*[RX,RY]; % not great because the box size changes as a
 % function of topography, which is bad if set in a loop
@@ -667,7 +710,7 @@ outputFileName = [fileName,'.out'];
 % load in block of data (TERRIBLE IDEA BUT FUCK IT): 
 expectedDataBlocks = 9; % this is here to make sure that I'm not fucking up the parsing of the output
 
-dataBlocks = read_blocks_of_numerical_data(outputFileName, 1000);
+dataBlocks = read_blocks_of_numerical_data(outputFileName, 10);
 numBlocks  = length(dataBlocks);
 
 if numBlocks ~= expectedDataBlocks
@@ -910,7 +953,6 @@ function [] = runGROW(X, Y, crackLocations, inputParameters, GROWInputParameters
 GROWInputFileName = [GROWInputParameters.growFileName, '.in'];
 
 fault_flaw  = GROWInputParameters.fault_flaw;
-intact_flaw = GROWInputParameters.intact_flaw;
 
 intact_flaw.xcoord      = crackLocations(:,1);
 intact_flaw.ycoord      = crackLocations(:,2);
