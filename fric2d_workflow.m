@@ -403,9 +403,9 @@ function [inputParameters, GROWInputParameters] = userInput()
     % grow input  parameters parameter
    
     % this will be part of the command to run GROW 
-    GROWInputParameters.angleResolution         = 10;
+    GROWInputParameters.angleResolution         = 20;
     GROWInputParameters.startAngle              = 100;
-    GROWInputParameters.endAngle                = 260;
+    GROWInputParameters.endAngle                = 261;
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STORING INPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

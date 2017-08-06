@@ -6,7 +6,7 @@ generalRunName = 'sample_run';
 
 % make the desired profile
 
-numPts = 50;
+numPts = 60;
 profileType =  'single_asperity';
 
 numberOfRuns = 1;
@@ -18,7 +18,7 @@ if strcmp(profileType,'single_asperity')
     asperityType            = {'sine'};     % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
     absoluteAsperityLenght  = 0.01;         % width of the asperity in m
     absoluteAsperityHeight  = 0.001;        % height of the asperity in m
-    padding                 = 2;            % padding on either side of the asperity that will just be flat (a factor of the asperityLength
+    padding                 = 3;            % padding on either side of the asperity that will just be flat (a factor of the asperityLength
 
     % duplicate input (make another specific array afterward if so desired
     asperityTypeArray            = repmat(asperityType,              1,numberOfRuns); % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
