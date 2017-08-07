@@ -125,21 +125,49 @@ organizefiles
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
 fric2dFig = figure;
+
+longPlot = 'off';
 numPlots        = 4;
 subPlotCount    = 1;
 
-title(sprintf('%s', fileName)) 
+if strcmp(longPlot, 'on')
+subplot(numPlots, 1, subPlotCount)
+end
+subPlotCount = subPlotCount+1;
 
 % a) geometry: (boundary box, fault, failure points)
-subplot(numPlots, 1, subPlotCount)
-subPlotCount = subPlotCount+1;
 hold on
 
 % plot the poundary box as a rectangle
 boundaryBox     = fill(             outputStruct.boundaryLines.xBeg , ...
                                     outputStruct.boundaryLines.yBeg , ...
                                     [0.8 0.8 0.8]);
+                                
+% make quiver plot of boundary conditions
+angle   = outputStruct.boundaryLines.angle;
+US      = outputStruct.boundaryLines.USMonotonic;
+UN      = outputStruct.boundaryLines.USMonotonic;
 
+hold on
+
+% make vectors
+elementDir =[cosd(angle),sind(angle)]./repmat((sqrt(cosd(angle).^2+sind(angle).^2)),1,2); %unit vecto in the direction of the element;
+USVec = elementDir.*repmat(US,1,2);
+R = [0 -1; 1, 0];
+UNVec = (R*elementDir'.*repmat(UN,1,2)')'; % rotated 90 degrees
+
+USQuivers = quiver(outputStruct.boundaryLines.xBeg , outputStruct.boundaryLines.yBeg , ...
+                   USVec(:,1), USVec(:,2), ...
+                   'AutoScale', 'off');
+
+UNQuivers1 = quiver(outputStruct.boundaryLines.xBeg , outputStruct.boundaryLines.yBeg , ...
+                   UNVec(:,1), UNVec(:,2), ...
+                   'AutoScale', 'off');
+               
+UNQuivers2 = quiver(outputStruct.boundaryLines.xBeg , outputStruct.boundaryLines.yBeg , ...
+                   -UNVec(:,1), -UNVec(:,2), ...
+                   'AutoScale', 'off');
+                                
 % plot the fault segments outputed from grow (if clause is within the function)                    
 plotGROWOutput('geometry')
 
@@ -177,6 +205,7 @@ axis equal
 xlabel('x (m)')
 ylabel('y (m)')
 
+if strcmp(longPlot, 'on')
 
 % b) displacmement (shear, normal)
 subplot(numPlots, 1, subPlotCount) 
@@ -239,7 +268,10 @@ hLegendD        = legend([coulombPlot           , ...
                           'tensile failure criterion (\sigma_3 - c > 0)');
 xlabel('x (m)')
 ylabel('(MPa)')
-        function plotGROWOutput(what2plot)
+
+end
+    % nested function: 
+   	function plotGROWOutput(what2plot)
             % plottting grow output
             % input:
             % what2plot: cell array, or string with thing to plot
@@ -278,14 +310,22 @@ ylabel('(MPa)')
                     error('input to function plotGROWOutput must be one, or many, of ''geometry''')
                 end % if geomtry is called
             end % if grow model is run
-        end % function to plot grow output
-    end % function to plot output
+    end % function to plot grow output
+    
+end % function to plot output
 
 % 8) organize files to reduce clutter in directory
     function organizefiles
     
 % make new directory for the files from this run
-newDirectoryName    = ['output/', fileName];
+
+% make an output directory if it does not already exist
+outputDirectoryName = 'output';
+if ~isdir(outputDirectoryName)
+    system(['mkdir ', outputDirectoryName])
+end
+    
+newDirectoryName    = [outputDirectoryName, '/', fileName];
 
 if ~isdir(newDirectoryName)
 command             = sprintf('mkdir %s', newDirectoryName);
@@ -371,10 +411,10 @@ function [inputParameters, GROWInputParameters] = userInput()
     % boundary conditions
     
     lithostatic_stress      = -80;
-    shear_stress            = -60;
+    shear_stress            = -80;
     
-    left_loading            = -0.0002;  % displacement on left end bit (m)
-    right_loading           = -0.00115;   % displacement on right end bit (m) 
+    left_loading            = -0.0005;  % displacement on left end bit (m)
+    right_loading           = -0.0013;   % displacement on right end bit (m) 
     
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -403,7 +443,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     % grow input  parameters parameter
    
     % this will be part of the command to run GROW 
-    GROWInputParameters.angleResolution         = 20;
+    GROWInputParameters.angleResolution         = 10;
     GROWInputParameters.startAngle              = 100;
     GROWInputParameters.endAngle                = 261;
     
@@ -755,6 +795,7 @@ boundaryLineHeaders     =     {'Elt'            , ...
                                'yEnd'           , ...
                                'length'         , ...
                                'angle'          , ...
+                               'kode'           , ...
                                'USstat'         , ...
                                'UNstat'         , ...
                                'USMonotonic'    , ...
