@@ -442,7 +442,8 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     % grow input  parameters parameter
    
-    % this will be part of the command to run GROW 
+    % this will be part of the command to run GROW (Must be digits - no
+    % decimal points)
     GROWInputParameters.angleResolution         = 10;
     GROWInputParameters.startAngle              = 100;
     GROWInputParameters.endAngle                = 261;
@@ -482,7 +483,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     GROWInputParameters.fault_flaw = fault_flaw;
     
     % software:
-    GROWInputParameters.GROW_perl_fileName = 'GROW_nov_17_15.pl';
+    GROWInputParameters.GROW_perl_fileName = 'GROW_AUG_2017.pl';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -523,7 +524,6 @@ function [X,Y] = checkinput(fileName, X,Y, numInput)
 end
 
 % check whether necessary files are in folder:
-
 function check_directory(GROWInputParameters)
 
 % check directory
@@ -670,9 +670,11 @@ newX = X - min(X) + boxSize(1)/2 - RX/2; % shift X to be centered in the observa
 
 fid=fopen(fileName,'w');
 
+
+
 for n = 1:(length(newX)-1)
     fprintf(fid, ...
-        '1 %f %f %f %f 0 1.00E+10 0 0 0 1 1 0\n', ...
+        '1 %f %f %f %f 0 1.00E+10 0 0 0 0.6 0 0\n', ...
         [newX(n),  Y(n),  newX(n+1),   Y(n+1)]');
 end
 
@@ -1139,8 +1141,10 @@ if done
         end
         
         fprintf(fid, ...
-            '1 %f %f %f %f 0 1.00E+10 0 0 0 1 1 0\n', ...
+            '1 %f %f %f %f 0 1.00E+10 0 0 0 0.6 0 0\n', ...
             [X(n),  Y(n),  X(n+1),   Y(n+1)]');
+        
+
     end
     
     fprintf(fid,'\n');
@@ -1155,7 +1159,8 @@ if done
     system(command);
     
     
-    command = sprintf('perl GROW_nov_17_15.pl %s %f %f %f'              , ...
+    command = sprintf('perl %s %s %.0f %.0f %.0f'              , ...
+        GROWInputParameters.GROW_perl_fileName, ...
         GROWInputFileName                   , ...
         GROWInputParameters.angleResolution , ...
         GROWInputParameters.startAngle    	, ...
