@@ -9,24 +9,20 @@ generalRunName = 'sample_run';
 numPts = 40;
 profileType =  'single_asperity';
 
-numberOfRuns = 1;
+numberOfRuns = 5;
 
 if strcmp(profileType,'single_asperity')
     
     % in construction
-    
     asperityType            = {'sine'};     % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
-    absoluteAsperityLength  = 0.01;         % width of the asperity in m
-    absoluteAsperityHeight  = 0.004;        % height of the asperity in m
-    absoluteFaultLength     = 0.07;          % fault length in m
-    %padding                 = 3;           % DEPRECATED : seems like a bad idea to change the box size (function of fault length) % padding on either side of the asperity that will just be flat (a factor of the asperityLength
-
+    absoluteAsperityLength  = 0.02;         % width of the asperity in m
+    absoluteAsperityHeight  = 0.005;        % height of the asperity in m
+    absoluteFaultLength     = 0.1;          % fault length in m
+    
     % duplicate input (make another specific array afterward if so desired
     asperityTypeArray            = repmat(asperityType,              1,numberOfRuns); % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
     absoluteAsperityLenghtArray  = repmat(absoluteAsperityLength,    1,numberOfRuns); % width of the asperity in m
     absoluteAsperityHeightArray  = repmat(absoluteAsperityHeight,    1,numberOfRuns); % height of the asperity in m
-    %paddingArray                 = repmat(padding,                   1,numberOfRuns); % padding on either side of the asperity that will just be flat (a factor of the asperityLength
-   
     absoluteFaultLengthArray     = repmat(absoluteFaultLength,       1,numberOfRuns); 
     
 end
@@ -35,10 +31,10 @@ numPtsArray = repmat(numPts, 1,numberOfRuns);
 
 %%%%% make custom array of length Nunmber of runs here: %%%%%%%%%%%%%%%%%%%
 % e.g.:
-%numPtsArray = ceil(linspace(10,300,numberOfRuns));
-% absoluteAsperityLenghtArray  = 0.01./(1:numberOfRuns);
-% absoluteAsperityHeightArray = 0.001./(1:numberOfRuns);
-% asperityTypeArray            = {'sine','triangle', 'box','step','jog'}; if length(asperityType ~= numberOfRuns); error(asperityTypes must be of length number of runs
+% numPtsArray                   = ceil(linspace(20,50,numberOfRuns));
+ absoluteAsperityLenghtArray   = absoluteAsperityLength + 2*0.005 - 0.001*(1:numberOfRuns);
+% absoluteAsperityHeightArray   = absoluteAsperityHeight./((1:numberOfRuns)*0.4);
+% asperityTypeArray             = {'sine','triangle', 'box','step','jog'}; if length(asperityType ~= numberOfRuns); error(asperityTypes must be of length number of runs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iRun = 1:numberOfRuns
@@ -47,18 +43,17 @@ if strcmp(profileType,'single_asperity')
     
     asperityType            = string(asperityTypeArray{iRun});
     absoluteAsperityLength  = absoluteAsperityLenghtArray(iRun);
-    absoluteAsperityHeight  = absoluteAsperityHeightArray(iRun);
-    % padding                 = paddingArray(iRun);     
+    absoluteAsperityHeight  = absoluteAsperityHeightArray(iRun);  
     numPts                  = numPtsArray(iRun);
     absoluteFaultLength     = absoluteFaultLengthArray(iRun);
     
  
     
-    pointSpacing = absoluteFaultLength/numPts; % spacing of points in 
+    pointSpacing = absoluteFaultLength/numPts; % spacing of points in m
    
     X = (0:numPts-1)*pointSpacing;
     
-    numAsperityPts = ceil(numPts/absoluteFaultLength*absoluteAsperityLength);
+    numAsperityPts = ceil(numPts*(absoluteAsperityLength/absoluteFaultLength));
     startInd = floor(numPts/2-numAsperityPts/2);
     
     if strcmp(asperityType, 'sine') % Hann window
@@ -95,7 +90,26 @@ tic
 fric2d_workflow(fileName,X,Y)
 runTime = toc;
 sprintf('run time was: %f seconds', runTime)
-end
+end %for
 
+% plot the figures in one single plot composed of subplots (this is
+% somewhat weird given that we are copying figures that have aleready been
+% produced
+if numberOfRuns ~= 1
+    figure
+    for n = 1:numberOfRuns
+        figureHandle = figure(n);
+        figure(numberOfRuns+1)
+        newSubPlotHandle = subplot(numberOfRuns,1,n);
+        copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
+        legend(newSubPlotHandle, sprintf('%s, h = %f, l = %f, A = %f',      ...
+                                         string(asperityTypeArray{n}),      ...
+                                         absoluteAsperityHeightArray(n),    ...
+                                         absoluteAsperityLenghtArray(n),    ...
+                                         absoluteAsperityHeightArray(n)/absoluteAsperityLenghtArray(n)))
+        axis equal
+    end
+    
+    
 
 end

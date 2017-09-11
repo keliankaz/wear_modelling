@@ -411,10 +411,10 @@ function [inputParameters, GROWInputParameters] = userInput()
     % boundary conditions
     
     lithostatic_stress      = -80;
-    shear_stress            = -80;
+    shear_stress            = -40;
     
-    left_loading            = -0.0005;  % displacement on left end bit (m)
-    right_loading           = -0.0013;   % displacement on right end bit (m) 
+    left_loading            = -0.000755;  % displacement on left end bit (m)
+    right_loading           = -0.00237;   % displacement on right end bit (m) 
     
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -424,13 +424,17 @@ function [inputParameters, GROWInputParameters] = userInput()
     % user choices
 
     inputParameters.user.showFric2DOutput          = 'yes';     % plot output from fric2d ('yes' or 'no')
-    inputParameters.user.cracks2grow               = 'max coulomb';     % 'all':           all the coordinates specified in input (tensile+shear)
-                                                                 % 'tensile':       only cracks that failed in tensile stress (listed in
-                                                                 %                  tensileFailureCoord)
-                                                                 % 'shear'          only cracks that failed in shear stress (listed in
-                                                                 %                  shearFailureCoord)
-                                                                 % 'max tensile'    most tensile crack
-                                                                 % 'max coulomb'      most sheared crack                                                            
+    inputParameters.user.cracks2grow               = 'max co';
+        % options:
+        % 'all':           all the coordinates specified in input (tensile+shear)
+        % 'tensile':       only cracks that failed in tensile stress (listed in
+        %                  tensileFailureCoord)
+        % 'shear'          only cracks that failed in shear stress (listed in
+        %                  shearFailureCoord)
+        % 'max tensile'    most tensile crack
+        % 'max coulomb'    most sheared crack  
+        % 'max tensile and max coulomb' both most shear and most tensile
+                                                                 
     inputParameters.user.runGROWModel              = 'yes' ;     % run grow ('yes' or 'no')
     inputParameters.user.plotGROWModel             = 'yes' ;     % plot grow output 'yes' or 'no' (make sure runGROWmodel is set to yes as well)
     
@@ -444,7 +448,7 @@ function [inputParameters, GROWInputParameters] = userInput()
    
     % this will be part of the command to run GROW (Must be digits - no
     % decimal points)
-    GROWInputParameters.angleResolution         = 10;
+    GROWInputParameters.angleResolution         = 30;
     GROWInputParameters.startAngle              = 100;
     GROWInputParameters.endAngle                = 261;
     
@@ -1000,14 +1004,17 @@ if ~strcmp(inputParameters.user.runGROWModel, 'yes')
 end
 
 CRACKLOCATION = [];
-if      strcmp(userChoice, 'all');          try CRACKLOCATION = [shearFailureCoord;tensileFailureCoord]; end 
-elseif  strcmp(userChoice, 'tensile');      try CRACKLOCATION = tensileFailureCoord; end
-elseif  strcmp(userChoice, 'max tensile');  try CRACKLOCATION = tensileFailureCoord(1,:); end % max is the first location because the list is sorted   
-elseif  strcmp(userChoice, 'shear');        try CRACKLOCATION = shearFailureCoord; end  
-elseif  strcmp(userChoice, 'max coulomb');  try CRACKLOCATION = shearFailureCoord(1,:); end % max is the first location because the list is sorted
+if      strcmp(userChoice, 'all');          try CRACKLOCATION = [shearFailureCoord;tensileFailureCoord];    end 
+elseif  strcmp(userChoice, 'tensile');      try CRACKLOCATION = tensileFailureCoord;                        end
+elseif  strcmp(userChoice, 'max tensile');  try CRACKLOCATION = tensileFailureCoord(1,:);                   end % max is the first location because the list is sorted   
+elseif  strcmp(userChoice, 'shear');        try CRACKLOCATION = shearFailureCoord;                          end  
+elseif  strcmp(userChoice, 'max coulomb');  try CRACKLOCATION = shearFailureCoord(1,:);                     end % max is the first location because the list is sorted
+elseif  strcmp(userChoice, 'max tensile and max coulomb') 
+    try CRACKLOCATION = [tensileFailureCoord(1,:);shearFailureCoord(1,:)];                                  end 
 else;                                       error('choosecracks ''userChoice'' input must be one of: ''all'', ''tensile'',''shear'',''max tensile'' or ''max coulomb''')
 end
 
+% note that this is effectively the 'catch' to the try's above
 if isempty(CRACKLOCATION) 
     disp('No cracks will fail given the specified conditions')
     return
@@ -1109,7 +1116,7 @@ if done
                 fprintf(fid, '\n');
                 fprintf(fid, 'fault segment_%i yes no yes\n'  , crackCount);
                 fprintf(fid, '*%s %s %s %s %s %s %s %s %s\n', ...
-                             'Crack'                        , ...
+                             'Tag'                        , ...
                              'stiffS'                       , ...
                              'stiffN'                       , ...
                              'T'                            , ...
@@ -1119,7 +1126,7 @@ if done
                              'friction-d'                   , ...
                              'L'                            );
                          
-                fprintf(fid, '*%f %f %f %f %f %f %f %f %f\n', ...
+                fprintf(fid, '*%s %f %f %f %f %f %f %f %f\n', ...
                                 'Crack'                     , ...
                                 fault_flaw.stiffS           , ...
                                 fault_flaw.stiffN           , ...
@@ -1303,8 +1310,6 @@ end
 %% 7) visually diaplay output information (function is located in embeded function section)
 
 %% 8) Organize files (function is located in embeded function section)
-
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
