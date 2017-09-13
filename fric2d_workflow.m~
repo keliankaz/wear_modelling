@@ -1,4 +1,4 @@
-function [] = fric2d_workflow(fileName,X,Y)
+function varargout = fric2d_workflow(fileName,X,Y)
 % Automated General work flow for the fric2d software 
 
 % INPUT:
@@ -11,7 +11,14 @@ function [] = fric2d_workflow(fileName,X,Y)
 % not yet set...
 
 % OUTPUT:
-% 
+%
+% GROWOUTPUT = fric2d_workflow(fileName,X,Y)  - (if one output)
+% GROWOUTPUT: structure with with fields corresponding to blocks of data
+%   segments: 1 by N (N is numuber of fault segments, or, equivalently, the
+%   number of defects+1) structure with fields corresponding to .eff
+%   headers for the crack information (num    xbeg    ybeg    xend    yend
+%   stiffS stiffN ten_str init_coh slid_coh stat_fric dy_fric crit_slip)
+%
 % must be in same folder as:
 % - simple_shear_bc.pl
 % - fric2D files
@@ -98,8 +105,15 @@ plotoutputinfo
 
 organizefiles
 
-% ------------------------------------------------------------------------------------------------------
-%% embeded functions 
+%% 9) send out the Ouput
+% generate the output of the function by assessing how many  outputs are
+% called for and sending out output accordingly
+
+generate_output
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------- embeded functions ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 7) plot output information into three plots
     function [] = plotoutputinfo(varargin)
@@ -382,12 +396,26 @@ profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
 
+% 9) send outputs (not called yet, not added to the documentation yet)
+    function generate_output
+        % check output request, generate the desired outputs
+        minArg = 0;
+        maxArg = 1; % - this can change (current maximum number of allowable outputs)
+        
+        nargoutchk(minAr,maxArg);
+        
+        numberOfOutputs = nargout;
+
+        if numberOfOuputs >= 1
+            varargout{1} = GROWOutputStruct;
+        end
+    end
 
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ------------------- User Input --------------------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ------------------- User Input -----------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function [inputParameters, GROWInputParameters] = userInput()
     inputParameters = [];
@@ -399,8 +427,8 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     E                       = 3000;     % Young's Modulus MPa
     nu                      = 0.25;     % Poisson's ratio
-    T                       = 10;       % Tensile strength of the host rock (MPa)
-    S_0                     = 5;        % Shear strength of the host rock (MPa)
+    T                       = 10;       % Tensile strength of the host rock (MPa) | 5-10
+    S_0                     = 5;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
     static_friction         = 0.6;      % static friction of crack elements
     dynamic_friction        = 0;        % dynamic friction of crack elements
     critical_slip_distance  = 10^-5;    % critical slip distance (m)
@@ -424,7 +452,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     % user choices
 
     inputParameters.user.showFric2DOutput          = 'yes';     % plot output from fric2d ('yes' or 'no')
-    inputParameters.user.cracks2grow               = 'max co';
+    inputParameters.user.cracks2grow               = 'max coulomb';
         % options:
         % 'all':           all the coordinates specified in input (tensile+shear)
         % 'tensile':       only cracks that failed in tensile stress (listed in
@@ -490,9 +518,9 @@ function [inputParameters, GROWInputParameters] = userInput()
     GROWInputParameters.GROW_perl_fileName = 'GROW_AUG_2017.pl';
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ------------------- section functions ----------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % check input
 function [X,Y] = checkinput(fileName, X,Y, numInput)
@@ -1311,6 +1339,7 @@ end
 
 %% 8) Organize files (function is located in embeded function section)
 
+%% 9) generate output (function is located in embeded function section)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ---------------------- handy tools -------------------------------------

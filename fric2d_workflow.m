@@ -1,4 +1,4 @@
-function [] = fric2d_workflow(fileName,X,Y)
+function GROWOutputStruct = fric2d_workflow(fileName,X,Y)
 % Automated General work flow for the fric2d software 
 
 % INPUT:
@@ -11,7 +11,14 @@ function [] = fric2d_workflow(fileName,X,Y)
 % not yet set...
 
 % OUTPUT:
-% 
+%
+% GROWOUTPUT = fric2d_workflow(fileName,X,Y)  - (if one output)
+% GROWOUTPUT: structure with with fields corresponding to blocks of data
+%   segments: 1 by N (N is numuber of fault segments, or, equivalently, the
+%   number of defects+1) structure with fields corresponding to .eff
+%   headers for the crack information (num    xbeg    ybeg    xend    yend
+%   stiffS stiffN ten_str init_coh slid_coh stat_fric dy_fric crit_slip)
+%
 % must be in same folder as:
 % - simple_shear_bc.pl
 % - fric2D files
@@ -98,8 +105,9 @@ plotoutputinfo
 
 organizefiles
 
-% ------------------------------------------------------------------------------------------------------
-%% embeded functions 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------- embeded functions ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 7) plot output information into three plots
     function [] = plotoutputinfo(varargin)
@@ -382,12 +390,11 @@ profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
 
-
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ------------------- User Input --------------------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ------------------- User Input -----------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function [inputParameters, GROWInputParameters] = userInput()
     inputParameters = [];
@@ -490,9 +497,9 @@ function [inputParameters, GROWInputParameters] = userInput()
     GROWInputParameters.GROW_perl_fileName = 'GROW_AUG_2017.pl';
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ------------------- section functions ----------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % check input
 function [X,Y] = checkinput(fileName, X,Y, numInput)
@@ -1311,6 +1318,7 @@ end
 
 %% 8) Organize files (function is located in embeded function section)
 
+%% 9) generate output (function is located in embeded function section)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ---------------------- handy tools -------------------------------------

@@ -6,7 +6,7 @@ generalRunName = 'sample_run';
 
 % make the desired profile
 
-numPts = 40;
+numPts = 30;
 profileType =  'single_asperity';
 
 numberOfRuns = 5;
@@ -29,30 +29,51 @@ end
 
 numPtsArray = repmat(numPts, 1,numberOfRuns);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% make custom array of length Nunmber of runs here: %%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % e.g.:
+
+% change the model resolution:
+% ----------------------------
 % numPtsArray                   = ceil(linspace(20,50,numberOfRuns));
- absoluteAsperityLenghtArray   = absoluteAsperityLength + 2*0.005 - 0.001*(1:numberOfRuns);
-% absoluteAsperityHeightArray   = absoluteAsperityHeight./((1:numberOfRuns)*0.4);
-% asperityTypeArray             = {'sine','triangle', 'box','step','jog'}; if length(asperityType ~= numberOfRuns); error(asperityTypes must be of length number of runs
+
+% change the length of the asperity:
+% ----------------------------------
+% absoluteAsperityLenghtArray   = absoluteAsperityLength + 0.001*(1:numberOfRuns);
+
+% change the height of the aperity:
+% ---------------------------------
+ absoluteAsperityHeightArray   = absoluteAsperityHeight./((1:numberOfRuns)*0.4);
+
+% change the type of asperity:
+% ----------------------------
+
+% asperityTypeArray             = {'sine','triangle', 'box','step','jog'}; 
+% if length(asperityType) ~= numberOfRuns 
+%     error('asperityTypes must be of length number of runs')
+% end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iRun = 1:numberOfRuns
     
 if strcmp(profileType,'single_asperity')
-    
+    %  query values for this iteration
     asperityType            = string(asperityTypeArray{iRun});
     absoluteAsperityLength  = absoluteAsperityLenghtArray(iRun);
     absoluteAsperityHeight  = absoluteAsperityHeightArray(iRun);  
     numPts                  = numPtsArray(iRun);
     absoluteFaultLength     = absoluteFaultLengthArray(iRun);
     
- 
-    
+    % determine point spacing
     pointSpacing = absoluteFaultLength/numPts; % spacing of points in m
-   
+    
+    % produce X-vector
     X = (0:numPts-1)*pointSpacing;
     
+    %
     numAsperityPts = ceil(numPts*(absoluteAsperityLength/absoluteFaultLength));
     startInd = floor(numPts/2-numAsperityPts/2);
     
@@ -84,26 +105,67 @@ elseif strcmp(profileType,'real_profile')
 end
     
 % interpolate so that dislocation element size remains constant: 
-T = linspace(0,1,numPts);
-[pt,~,~] = interparc(T,X,Y);
-X = pt(:,1);
-Y = pt 
+T           = linspace(0,1,numPts);     % make fractional-size array (point along the arc at wich points will be interpolated)
+[pt,~,~]    = interparc(T,X,Y);         % interpolate along arc
 
+% reassign to  X and Y for simplicity's sake
+X           = pt(:,1);                  
+Y           = pt(:,2);
 
+% generate descriptive file name
 fileName = sprintf('%s_%s_%s_%s_run%i',generalRunName, profileType, asperityType, date, iRun);
                 
 % run the work flow
 tic
-fric2d_workflow(fileName,X,Y)
+growOutput = fric2d_workflow(fileName,X,Y);
 runTime = toc;
 sprintf('run time was: %f seconds', runTime)
+
+% make plot of dHdx as a function of H0
+% -------------------------------------
+
+plotdHdxYN = 'yes';
+if strcmp(plotdHdxYN,'yes')
+    
+    if iRun == 1 % intialize variables (for clarity and avoiding multiple if statements was put here)
+        Hf      = zeros(1,numberOfRuns);
+        H0      = zeros(1,numberOfRuns);
+    end
+    
+    Hf(iRun)    = getHfVal(plotdHdxYN,growOutput);    % plot the dH/dx as a function of initial height
+    H0(iRun)    = absoluteAsperityHeight;
+    
+    if iRun == numberOfRuns
+        dHdx = H0-Hf;
+        figure
+        loglog(dHdx,H0,'.-')
+    end
+end
+
 end %for
 
+
+plot_aggregate(numberOfRuns)    % plot all the failure geometries in a single plot (see subfunction for more)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% -------------------------- Nested function -----------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function plot_aggregate(numberOfRuns)
 % plot the figures in one single plot composed of subplots (this is
 % somewhat weird given that we are copying figures that have aleready been
 % produced
-if numberOfRuns ~= 1
-    figure
+
+% input:
+%numberOfRuns: the number of runs, the function will not run if the number
+%of runs is 1
+
+% return if numberOfRuns ==1
+if numberOfRuns ==1
+    return
+end
+
+ figure
     for n = 1:numberOfRuns
         figureHandle = figure(n);
         figure(numberOfRuns+1)
@@ -683,4 +745,26 @@ else
 end
 
 end % function validstring
+
+function DHDX = getHfVal(plotYN, GROWOutputStruct)
+% compute the value of the Height change
+
+% ONLY WORKS FOR SINGLE ASPERITY, SINGLE CRACK CASE!
+
+% input:
+% plotYN: 'yes' or 'no'- whether or not to use the function
+% growOuputStruct: output produced by fric2d_workflow
+
+if strcmp(plotYN, 'no')
+    return
+elseif ~strcmp(plotYN, 'yes')
+    error('Error using plot_dHdxVsH, input must be ''yes'' or ''no''')
+end
+
+yBeg = GROWOutputStruct.segments(1).ybeg;
+yEnd = GROWOutputStruct.segments(1).yend;
+yMax = max(max(abs([yBeg;yEnd])));
+
+DHDX = yMax;
+end
 
