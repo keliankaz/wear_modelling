@@ -6,17 +6,17 @@ generalRunName = 'sample_run';
 
 % make the desired profile
 
-numPts = 30;
+numPts = 50;
 profileType =  'single_asperity';
 
-numberOfRuns = 5;
+numberOfRuns = 10;
 
 if strcmp(profileType,'single_asperity')
     
     % in construction
     asperityType            = {'sine'};     % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
-    absoluteAsperityLength  = 0.02;         % width of the asperity in m
-    absoluteAsperityHeight  = 0.005;        % height of the asperity in m
+    absoluteAsperityLength  = 0.025;        % width of the asperity in m
+    absoluteAsperityHeight  = 0.007;        % height of the asperity in m
     absoluteFaultLength     = 0.1;          % fault length in m
     
     % duplicate input (make another specific array afterward if so desired
@@ -44,7 +44,7 @@ numPtsArray = repmat(numPts, 1,numberOfRuns);
 
 % change the height of the aperity:
 % ---------------------------------
- absoluteAsperityHeightArray   = absoluteAsperityHeight./((1:numberOfRuns)*0.4);
+ absoluteAsperityHeightArray   = absoluteAsperityHeight-0.001*(1:numberOfRuns);
 
 % change the type of asperity:
 % ----------------------------
@@ -54,7 +54,6 @@ numPtsArray = repmat(numPts, 1,numberOfRuns);
 %     error('asperityTypes must be of length number of runs')
 % end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iRun = 1:numberOfRuns
@@ -168,7 +167,7 @@ end
  figure
     for n = 1:numberOfRuns
         figureHandle = figure(n);
-        figure(numberOfRuns+1)
+        figure(numberOfRuns+2)
         newSubPlotHandle = subplot(numberOfRuns,1,n);
         copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
         legend(newSubPlotHandle, sprintf('%s, h = %f, l = %f, A = %f',      ...
@@ -182,7 +181,9 @@ end
 
 end % function sample_run
 
-%% subfunction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ---------------------------subfunction----------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% interpolate curve with constant element length (Author: John D'Errico - fileExchange)
 function [pt,dudt,fofthandle] = interparc(t,px,py,varargin)

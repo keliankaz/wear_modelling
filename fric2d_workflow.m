@@ -406,8 +406,8 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     E                       = 3000;     % Young's Modulus MPa
     nu                      = 0.25;     % Poisson's ratio
-    T                       = 10;       % Tensile strength of the host rock (MPa) | 5-10
-    S_0                     = 5;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
+    T                       = 100000000000000000;       % Tensile strength of the host rock (MPa) | 5-10
+    S_0                     = 250000000000000000;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
     static_friction         = 0.6;      % static friction of crack elements
     dynamic_friction        = 0;        % dynamic friction of crack elements
     critical_slip_distance  = 10^-5;    % critical slip distance (m)
@@ -455,9 +455,9 @@ function [inputParameters, GROWInputParameters] = userInput()
    
     % this will be part of the command to run GROW (Must be digits - no
     % decimal points)
-    GROWInputParameters.angleResolution         = 30;
-    GROWInputParameters.startAngle              = 100;
-    GROWInputParameters.endAngle                = 261;
+    GROWInputParameters.angleResolution         = 10;
+    GROWInputParameters.startAngle              = 1;
+    GROWInputParameters.endAngle                = 359;
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STORING INPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

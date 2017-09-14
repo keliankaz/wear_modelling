@@ -6,17 +6,17 @@ generalRunName = 'sample_run';
 
 % make the desired profile
 
-numPts = 50;
+numPts = 35;
 profileType =  'single_asperity';
 
-numberOfRuns = 10;
+numberOfRuns = 1;
 
 if strcmp(profileType,'single_asperity')
     
     % in construction
     asperityType            = {'sine'};     % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
     absoluteAsperityLength  = 0.025;        % width of the asperity in m
-    absoluteAsperityHeight  = 0.007;        % height of the asperity in m
+    absoluteAsperityHeight  = 0.001;        % height of the asperity in m
     absoluteFaultLength     = 0.1;          % fault length in m
     
     % duplicate input (make another specific array afterward if so desired
@@ -44,7 +44,7 @@ numPtsArray = repmat(numPts, 1,numberOfRuns);
 
 % change the height of the aperity:
 % ---------------------------------
- absoluteAsperityHeightArray   = absoluteAsperityHeight-0.00005*(1:numberOfRuns);
+ absoluteAsperityHeightArray   = absoluteAsperityHeight./(1:numberOfRuns);
 
 % change the type of asperity:
 % ----------------------------
@@ -123,7 +123,7 @@ sprintf('run time was: %f seconds', runTime)
 % make plot of dHdx as a function of H0
 % -------------------------------------
 
-plotdHdxYN = 'yes';
+plotdHdxYN = 'no';
 if strcmp(plotdHdxYN,'yes')
     
     if iRun == 1 % intialize variables (for clarity and avoiding multiple if statements was put here)
