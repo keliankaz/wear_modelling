@@ -1,4 +1,4 @@
-function varargout = fric2d_workflow(fileName,X,Y)
+function GROWOutputStruct = fric2d_workflow(fileName,X,Y)
 % Automated General work flow for the fric2d software 
 
 % INPUT:
@@ -105,12 +105,6 @@ plotoutputinfo
 
 organizefiles
 
-%% 9) send out the Ouput
-% generate the output of the function by assessing how many  outputs are
-% called for and sending out output accordingly
-
-generate_output
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------- embeded functions ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -140,7 +134,7 @@ generate_output
 
 fric2dFig = figure;
 
-longPlot = 'off';
+longPlot = 'on';
 numPlots        = 4;
 subPlotCount    = 1;
 
@@ -396,21 +390,6 @@ profileName = [fileName,'_profile.txt']; system(['rm ',profileName]);
 
     end
 
-% 9) send outputs (not called yet, not added to the documentation yet)
-    function generate_output
-        % check output request, generate the desired outputs
-        minArg = 0;
-        maxArg = 1; % - this can change (current maximum number of allowable outputs)
-        
-        nargoutchk(minAr,maxArg);
-        
-        numberOfOutputs = nargout;
-
-        if numberOfOuputs >= 1
-            varargout{1} = GROWOutputStruct;
-        end
-    end
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -428,7 +407,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     E                       = 3000;     % Young's Modulus MPa
     nu                      = 0.25;     % Poisson's ratio
     T                       = 10;       % Tensile strength of the host rock (MPa) | 5-10
-    S_0                     = 5;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
+    S_0                     = 25;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
     static_friction         = 0.6;      % static friction of crack elements
     dynamic_friction        = 0;        % dynamic friction of crack elements
     critical_slip_distance  = 10^-5;    % critical slip distance (m)
@@ -440,11 +419,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     lithostatic_stress      = -80;
     shear_stress            = -40;
-    
-    left_loading            = -0.000755;  % displacement on left end bit (m)
-    right_loading           = -0.00237;   % displacement on right end bit (m) 
-    
-    
+   
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % MORE TECHNICAL CHANGES:
@@ -476,9 +451,9 @@ function [inputParameters, GROWInputParameters] = userInput()
    
     % this will be part of the command to run GROW (Must be digits - no
     % decimal points)
-    GROWInputParameters.angleResolution         = 30;
-    GROWInputParameters.startAngle              = 100;
-    GROWInputParameters.endAngle                = 261;
+    GROWInputParameters.angleResolution         = 20;
+    GROWInputParameters.startAngle              = 1;
+    GROWInputParameters.endAngle                = 359;
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STORING INPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -496,11 +471,6 @@ function [inputParameters, GROWInputParameters] = userInput()
     inputParameters.boundaryConditions.sigyy       = lithostatic_stress;    % normal stress perpendicular to faults MPa
     inputParameters.boundaryConditions.shear       = shear_stress;          % shear stress on faults  MPa
 
-    % end bits
-    inputParameters.boundaryConditions.BVSTop      = left_loading;  % displacement on left end bit (m)
-    inputParameters.boundaryConditions.BVSBot      = right_loading;   % displacement on right end bit (m) 
-
-    
     % parameters tacked on to input file
     fault_flaw              = [];
     fault_flaw.stiffS       = shear_stiffness;          % shear stiffness
@@ -629,17 +599,12 @@ command = sprintf(commandFormat         , ...
             
 system(command);
 
-% make the endbit so that there is not a displacement discontinuity at the
-% end of the fault 
-BVSTop      = inputParameters.boundaryConditions.BVSTop;
-BVSBot      = inputParameters.boundaryConditions.BVSBot;
-
 % calculate number of endbit segments on either side of input fault
 % geometry (magic number 4 is used to calulate half the distance from the
 % tip of the fault geometry to the end  side of the box)
+
 numBufferSegments = floor(boxSize(1)/(padding*4*meanSegmentLength));
-make_end_bits(X,Y, numBufferSegments, BVSTop, BVSBot);
-% make the length of the end bit a function of the profile length
+make_end_bits(X,Y, numBufferSegments, meanSegmentLength, boxSize, inputParameters);
 
 % add tag line for the first fault
 fault_header_fileName = 'fault_header.txt';
@@ -658,7 +623,7 @@ system(command);
     
 % 1a) make the fault geometry based on series of x-y points, get the mean BEM
 % size and determine the appropriate box size
-function [newX, MEAN_SEGMENT_LENGTH,boxSize] = makeprofile(fileName,X,Y,padding, boxAspectRatio)
+    function [newX, MEAN_SEGMENT_LENGTH,boxSize] = makeprofile(fileName,X,Y,padding, boxAspectRatio)
 
 % prints profile defined by vertical vectors X and Y in line element form
 % in the file specified by input fileName
@@ -702,8 +667,6 @@ newX = X - min(X) + boxSize(1)/2 - RX/2; % shift X to be centered in the observa
 
 fid=fopen(fileName,'w');
 
-
-
 for n = 1:(length(newX)-1)
     fprintf(fid, ...
         '1 %f %f %f %f 0 1.00E+10 0 0 0 0.6 0 0\n', ...
@@ -711,57 +674,117 @@ for n = 1:(length(newX)-1)
 end
 
 fprintf(fid, '\n');
-
 fclose(fid);
 
 end
 
 % 1b) add end bits to input file according to numBuffer segments (figiting
 % needed)
-function [] = make_end_bits(X,Y,numBufferSegments, BVSTop, BVSBot)
+
+    function [] = make_end_bits(X,Y,numBufferSegments, meanSegmentLength, BOXSIZE, inputParameters) % MAKE ThE FUNCTION CALL MATCh
 
     intro =    {'*FRACTURES'; ...
     '*num	xbeg	ybeg	xend	yend	kode	bvs     bvn     bvs     bvn'; ...
     '*----	----	----	----	----	----	------	----	-----	--------'};
+    
+    tempFileName = 'end_bits.txt';
+    fileID = fopen(tempFileName,'w');
+    fprintf(fileID,'%s\r\n',intro{:});
+    fclose(fileID)
+    % find ends of the fault
+    X1      = X(1);
+    Y1      = Y(1);
+    Xend    = X(end);
+    Yend    = Y(end);
 
-fileID = fopen('end_bits.txt','w');
-fprintf(fileID,'%s\r\n',intro{:});
+    % find end of each end bit
+    start1  = [X1-numBufferSegments*meanSegmentLength,Y1];
+    end1    = [X1,Y1];
+    start2  = [Xend,Yend];
+    end2    = [Xend+numBufferSegments*meanSegmentLength,Yend];
+    
+    modelHeight = BOXSIZE(2); % CHECK THIS
+    make_one_EB('left' ,tempFileName, start1,end1,numBufferSegments,meanSegmentLength, modelHeight, inputParameters);
+    make_one_EB('right',tempFileName, start2,end2,numBufferSegments,meanSegmentLength, modelHeight, inputParameters);
 
-X1      = X(1);
-Y1      = Y(1);
-Xend    = X(end);
-Yend    = Y(end);
-start1  = [X1-numBufferSegments*meanSegmentLength,Y1];
-end1    = [X1,Y1];
-start2  = [Xend,Yend];
-end2    = [Xend+numBufferSegments*meanSegmentLength,Yend];
+        function [] = make_one_EB(EBName, fileName, EBStart, EBEnd,numBufferSegments, meanSegmentLength, MODELHEIGHT, inputParameters)
+            
+            % function to make one end bit to avoid redundancy...
+            
+            % make set of X coordinates for each end bit
+            % Left end bit (LEB):
+            EBX      = linspace(EBStart(1),EBEnd(1),numBufferSegments+1);
+            
+            % make start and end
+            EBXBeg  = EBX(1:end-1);
+            EBXEnd  = EBX(2:end);
+                        
+            EBY      = linspace(EBStart(2),EBEnd(2),numBufferSegments+1);
+            
+            % make start and end
+            EBYBeg  = EBY(1:end-1);
+            EBYEnd  = EBY(2:end);
+            
+            % ... and midpoints
+            EBXMid  = (EBXBeg+EBXEnd)/2;
+            EBYMid  = (EBYBeg+EBYEnd)/2;
+                                 
+            EBUs    = calc_end_bit_displacement(EBXMid,EBYMid, ...
+                                                MODELHEIGHT, ...
+                                                inputParameters.material.E  , ...
+                                                inputParameters.material.nu , ...
+                                                inputParameters.boundaryConditions.sigxx, ...
+                                                inputParameters.boundaryConditions.sigyy, ...
+                                                inputParameters.boundaryConditions.shear, ...
+                                                meanSegmentLength);
+            
+            % header section
+            FID = fopen(fileName,'a');
+            fprintf(FID, 'fracture %s no no\n',EBName);
+            kode = 3;
+            bvs = 0;
+            bvn = 0;
+            
+            % individual elements
+            for iElement = 1:numBufferSegments               
+                
+                ROW1    = [ 1, ...
+                            EBXBeg(iElement), ...
+                            EBYBeg(iElement), ...
+                            EBXEnd(iElement), ...
+                            EBYEnd(iElement), ...
+                            kode, ...
+                            bvs,...
+                            bvn,...
+                            EBUs(iElement),...
+                            inputParameters.boundaryConditions.sigxx ];
+                        
+                fprintf(FID, '%f %f %f %f %f %f %f %f %f %f\n',ROW1);
+                
+            end
+            fprintf(FID, '\n');
+            fclose(FID);
+            
+        end
 
-% put in a formulation so that the velocity boundaries are defined be a
-% strain rate and the length and height of the box rather than arbitrary
-% numbers
-% strainRate =   ....
+        function [US] = calc_end_bit_displacement(x,y,h,E,nu,sigyy,sigxx,shear,elementSize)
+            % analytical solution for the displacement (u_s) on the end bits  
 
-%End bits:      left end bit    right end bit
-%               -------------   ---------------
-kode        = [ 3,              3               ];
-bvs         = [ 0,              0               ];
-bvn         = [ 0,              0               ];
-BVS         = [ BVSTop,         BVSBot          ];
-BVN         = [ -100;           -100            ];
+            % Input (1 by 1 or 1 by N)
+            % [x,y]:            center coordinate of the endbit element
+            % E:                Yougn's Mofulous (MPa) 1 by 
+            % nu:               Poisson's ratio
+            % [sigxx, sigyy]:   Lithostatic stress (MPa)
+            % shear:            Shear stress (MPa)
+            % elementSize:      Size of boundary elements (2x slip) (m)
 
-% make the rows of data for input file
-
-ROW1    = [numBufferSegments, start1,end1,kode(1),bvs(1),bvn(1),BVS(1),BVN(1)];
-ROW2    = [numBufferSegments, start2,end2,kode(2),bvs(2),bvn(2),BVS(2),BVN(2)];
-
-% write them to the file
-fprintf(fileID, 'fracture left no no');
-fprintf(fileID, '\n%f %f %f %f %f %f %f %f %f %f \n\n',ROW1);
-fprintf(fileID, 'fracture right no no');
-fprintf(fileID, '\n%f %f %f %f %f %f %f %f %f %f \n\n',ROW2);
-fclose(fileID);
-
-end
+            % analytical calculation
+            US = -(x./E) .* ((1-nu.^2).*-sigxx - nu.*(1+nu).*-sigyy) +...
+                 ( -shear  .* (y+h/2)   .*2*(1+nu)./E) - ...
+                 elementSize/4;
+             
+        end % function [US] = calc_end_bit_displacement(x,y,E,nu,sigyy,sigxx,shear,elementSize)
+    end %  function [] = make_end_bits(X,Y,numBufferSegments, BVSTop, BVSBot)
 
 end
 
@@ -1461,88 +1484,5 @@ else;                   sigma11 = sigmaT;
                         sigma22 = sigmaN;
 end
 end
-% -------------------------------------------------------------------------
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------function no longer in use ------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% extract sections of text file using system commands
-function getsection(fileName, anotherFileName, startString, endString)
-
-% extract sections of text file using system commands
-
-% input: 
-
-% fileName:   input file name from which the section will be extracted 
-% sartString: string that marks the beginning of the section to be selected
-% endString:  string that marks the end of the section to be selected
-% 
-% note that the section should have clear column headers, and data section
-%
-% output:
-%
-% structure array with 3 fields: 
-% 1) DESIRED_SECTION.data:      data section
-% 3) 
-% Usage:
-% DESIRED_SECTION = getsection(fileName, startString, endString)
-
-command1 = ['sed -n -e '',/'    , ...
-           startString          , ...
-           '/,/'                , ...
-           endString            , ...
-           'p'' '               , ...
-           fileName             , ...
-           ' > '                , ...
-           anotherFileName      ];
-       
-         
-system(command1)                        % grab section between startString and endString
-
-end
-
-%% grab all the data blocks from the output data: 
-function [DATABLOCKS] = grabdata(fileName, numBlock, numColumnArray, numHeaderArray)
-
-%(NOTE THAT THIS RELIES ON THE POUTPUT  STRUCTURE TO BEIDENTICAL EVERY TIME
-%- I.E. NUMBER OF HEADER COLUMNS, NUMBER OF DATA BLOCK)
-
-fid=fopen(fileName);
-for i=1:numBlock
-    fmt=repmat('%f',1,numColumnArray(i));  % build the format string for the number columns
-    a(i)=textscan(fid,fmt,'headerlines',numHeaderArray(i),'collectoutput',1); % read section
-end
-fid=fclose(fid);
-
-end
-
-%% parse user input
-function S = setVal(S, name, input)
-% set user specified inputs to a default structure based on "pair-wise
-% input"
-
-% S         : is a structure to whom 'name' fields will be assigned if they exist in
-%             the 'input'
-% name      : cell array of all fields to possibly set
-% input     : cell array of pair-wise input values
-
-if length(input) >= 2
-    
-    specifier   = input(1:2:end);
-    value       = input(2:2:end);
-    
-    for iName = 1:length(name)
-        
-        fieldName   = name(iName);
-        ind         = strcmp(fieldName, specifier); % check every odd input
-        fieldName   = char(fieldName);
-        
-        if any(ind)
-            S.(fieldName) = value{ind}; %  assign field val to even input
-        end
-        
-    end
-end
-end
-% -------------------------------------------------------------------------

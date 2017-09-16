@@ -1,70 +1,48 @@
 function sample_run(varargin)
+% Sets up one, or many, sample runs of the fric2d and GROW workflow.
+
+% input (pair-wise default value as showd)
+% ...,'numberOfRuns',1, ...     : Number of runs over which the code will be iterated
+% ...,'numberOfElements',35,    : Number of boundary elements on the fault
+% ...,'asperityHeigth',0.002    : Height of asperity in meters
+% ...,'asperityLength',0.025    : Length of asperity in meters
+% ...,'shape', 'sine',          : shape of the asperity 
+%                                (one of: % 'sine','triangle','box','step',
+%                                'jog','real profile')
+
+% Numeric inputs be iteratively changed by choosing the minimum and maximum
+% value as the input array of length 2. I produce an array  be linear
+% interpolation of length numberOfRuns, between these two values.
+
+% More options: (to do)
+
+% sample usage
+% >> sample_run('numberOfRun', 5, 'asperityHeight', [0.002,0.003])
+
+% Incorrect use:
+% >> sample_run('numberOfRun', 3, 'asperityLengh', [0.02,0.03, 0.004])
+
+p = parse_user_input(varargin);
 
 % name of the run 
-
-generalRunName = 'sample_run';
+generalRunName = p.fileName;
 
 % make the desired profile
 
-numPts = 50;
-profileType =  'single_asperity';
+numPts = p.numberOfElements;
+profileType =  p.profileType;
 
-numberOfRuns = 10;
-
-if strcmp(profileType,'single_asperity')
-    
-    % in construction
-    asperityType            = {'sine'};     % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
-    absoluteAsperityLength  = 0.025;        % width of the asperity in m
-    absoluteAsperityHeight  = 0.007;        % height of the asperity in m
-    absoluteFaultLength     = 0.1;          % fault length in m
-    
-    % duplicate input (make another specific array afterward if so desired
-    asperityTypeArray            = repmat(asperityType,              1,numberOfRuns); % type of asperity (sine, traingle, box, step, etc - see the avialble functionaltity below)
-    absoluteAsperityLenghtArray  = repmat(absoluteAsperityLength,    1,numberOfRuns); % width of the asperity in m
-    absoluteAsperityHeightArray  = repmat(absoluteAsperityHeight,    1,numberOfRuns); % height of the asperity in m
-    absoluteFaultLengthArray     = repmat(absoluteFaultLength,       1,numberOfRuns); 
-    
-end
-
-numPtsArray = repmat(numPts, 1,numberOfRuns);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% make custom array of length Nunmber of runs here: %%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% e.g.:
-
-% change the model resolution:
-% ----------------------------
-% numPtsArray                   = ceil(linspace(20,50,numberOfRuns));
-
-% change the length of the asperity:
-% ----------------------------------
-% absoluteAsperityLenghtArray   = absoluteAsperityLength + 0.001*(1:numberOfRuns);
-
-% change the height of the aperity:
-% ---------------------------------
- absoluteAsperityHeightArray   = absoluteAsperityHeight-0.001*(1:numberOfRuns);
-
-% change the type of asperity:
-% ----------------------------
-
-% asperityTypeArray             = {'sine','triangle', 'box','step','jog'}; 
-% if length(asperityType) ~= numberOfRuns 
-%     error('asperityTypes must be of length number of runs')
-% end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+numberOfRuns = p.numberOfRuns;
 
 for iRun = 1:numberOfRuns
     
 if strcmp(profileType,'single_asperity')
     %  query values for this iteration
-    asperityType            = string(asperityTypeArray{iRun});
-    absoluteAsperityLength  = absoluteAsperityLenghtArray(iRun);
-    absoluteAsperityHeight  = absoluteAsperityHeightArray(iRun);  
-    numPts                  = numPtsArray(iRun);
-    absoluteFaultLength     = absoluteFaultLengthArray(iRun);
+    asperityType            = p.shape;
+    absoluteAsperityLength  = p.asperityLength(iRun);
+    absoluteAsperityHeight  = p.asperityHeight(iRun);  
+    numPts                  = p.numberOfElements(iRun);
+    absoluteFaultLength     = p.faultLength(iRun);
     
     % determine point spacing
     pointSpacing = absoluteFaultLength/numPts; % spacing of points in m
@@ -123,7 +101,7 @@ sprintf('run time was: %f seconds', runTime)
 % make plot of dHdx as a function of H0
 % -------------------------------------
 
-plotdHdxYN = 'yes';
+plotdHdxYN = 'no';
 if strcmp(plotdHdxYN,'yes')
     
     if iRun == 1 % intialize variables (for clarity and avoiding multiple if statements was put here)
@@ -171,7 +149,7 @@ end
         newSubPlotHandle = subplot(numberOfRuns,1,n);
         copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
         legend(newSubPlotHandle, sprintf('%s, h = %f, l = %f, A = %f',      ...
-                                         string(asperityTypeArray{n}),      ...
+                                         string(asperityTypeArray),      ...
                                          absoluteAsperityHeightArray(n),    ...
                                          absoluteAsperityLenghtArray(n),    ...
                                          absoluteAsperityHeightArray(n)/absoluteAsperityLenghtArray(n)))
@@ -184,6 +162,86 @@ end % function sample_run
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ---------------------------subfunction----------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function p = parse_user_input(input)
+
+p =  inputParser;
+
+p.FunctionName = 'sample_run';
+
+% default setting
+defaultRunName        = 'sample_run';
+defaultProfileType    = 'single_asperity';
+
+defaultNumberOfRuns   = 1;
+defaultNumberOfElements=35;
+
+defaultShape          = 'sine';
+expectedShapes        = {'sine','triangle','box','step','jog','real profile'};
+
+defaultFaultLength    = 0.1;
+defaultAsperityHeight = 0.005;
+defaultAsperityLenght = 0.025;
+
+defaultPlotOption     = 'long plot';
+expectedPlotOptions   = {'long plot', 'short','off','all','dh/dx vs h'};
+
+addParameter(p,'fileName',          defaultRunName);
+addParameter(p,'profileType',       defaultProfileType);
+addParameter(p,'shape',             defaultShape, @(x) any(validatestring(x,expectedShapes)));
+
+errorMsg = 'Value must be positive, scalar, and numeric.'; 
+validationFcn = @(x) assert(isnumeric(x) && ~any(x<0),errorMsg);
+
+addParameter(p,'numberOfRuns'      , defaultNumberOfRuns,   validationFcn);
+addParameter(p,'numberOfElements'  , defaultNumberOfElements,validationFcn);
+addParameter(p,'asperityLength'    , defaultAsperityLenght, validationFcn);
+addParameter(p,'asperityHeight'    , defaultAsperityHeight, validationFcn);
+addParameter(p,'faultLength'       , defaultFaultLength,    validationFcn);
+
+addParameter(p,'plot',               defaultPlotOption, @(x) any(validatestring(x,expectedPlotOptions)));
+
+parse(p,input{:})
+
+p = p.Results;
+
+if p.numberOfRuns ~= 1 
+    if strcmp(p.plot, 'long plot')
+        warning('if number of plot ~= 1, the long plot option is not possible')
+        p.plot = 'short';
+    end
+    
+    numEl = cellfun(@numel,{p.numberOfElements,p.aperityLenght,p.asperityHeight,p.faultLength});
+    
+    if ~any(numEl>1)
+        warning('no variable is set to be more than one value, nothing to iterate')
+        p.numberOfRuns = 1;
+    end
+    
+    if sum(numEl>1)>1
+       if ~all(numEl(numEl>1)) == max(numEl)
+           error('all numric input that are of length more than 1 must be of same length')
+       end
+    end
+    
+    p.numberOfElements =makeArray(p.numberOfElements,   p.numberOfRuns); 
+    p.asperityLength =  makeArray(p.asperityLength,     p.numberOfRuns);
+    p.asperityHeight =  makeArray(p.asperityHeight,     p.numberOfRuns);
+    p.faultLength =     makeArray(p.faultLength,        p.numberOfRuns);
+    
+end
+
+    function out = makeArray(in,N)
+        L = length(in);
+            if L==1
+                out = repmat(in,1,N);
+            elseif L==2
+                out = linspace(in(1),in(2),N);
+            else
+                error('Sample_run cannot handle inputs of length > 2')
+            end 
+    end
+end
 
 %% interpolate curve with constant element length (Author: John D'Errico - fileExchange)
 function [pt,dudt,fofthandle] = interparc(t,px,py,varargin)
