@@ -20,7 +20,9 @@ function sample_run(varargin)
 % >> sample_run('numberOfRun', 5, 'asperityHeight', [0.002,0.003])
 
 % Incorrect use:
-% >> sample_run('numberOfRun', 3, 'asperityLengh', [0.02,0.03, 0.004])
+% >> sample_run('numberOfRun', 3, 'asperityLengh', [0.02,0.03, 0.04])
+% 
+
 
 p = parse_user_input(varargin);
 
@@ -94,7 +96,7 @@ fileName = sprintf('%s_%s_%s_%s_run%i',generalRunName, profileType, asperityType
                 
 % run the work flow
 tic
-growOutput = fric2d_workflow(fileName,X,Y);
+growOutput = fric2d_workflow(fileName,X,Y,p.plotOption);
 runTime = toc;
 sprintf('run time was: %f seconds', runTime)
 
@@ -199,7 +201,7 @@ addParameter(p,'asperityLength'    , defaultAsperityLenght, validationFcn);
 addParameter(p,'asperityHeight'    , defaultAsperityHeight, validationFcn);
 addParameter(p,'faultLength'       , defaultFaultLength,    validationFcn);
 
-addParameter(p,'plot',               defaultPlotOption, @(x) any(validatestring(x,expectedPlotOptions)));
+addParameter(p,'plotOption',               defaultPlotOption, @(x) any(validatestring(x,expectedPlotOptions)));
 
 parse(p,input{:})
 

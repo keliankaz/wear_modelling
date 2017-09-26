@@ -16,11 +16,16 @@ function sample_run(varargin)
 
 % More options: (to do)
 
-% sample usage
+% sample usage:
+% run five iterations where the height is incrementally changed from the
+% minim value, 0.002 m, to 0.003 m in heigth
 % >> sample_run('numberOfRun', 5, 'asperityHeight', [0.002,0.003])
+
 
 % Incorrect use:
 % >> sample_run('numberOfRun', 3, 'asperityLengh', [0.02,0.03, 0.04])
+% * 'asperityLengh', [0.02,0.03, 0.04] - the numeric specifiers must be a
+% maximum and minimum values 
 
 
 p = parse_user_input(varargin);
