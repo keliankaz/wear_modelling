@@ -4,7 +4,7 @@ function sample_run(varargin)
 % input (pair-wise default value as showd)
 % ...,'numberOfRuns',1, ...     : Number of runs over which the code will be iterated
 % ...,'numberOfElements',35,    : Number of boundary elements on the fault
-% ...,'asperityHeigth',0.002    : Height of asperity in meters
+% ...,'asperityHeight',0.002    : Height of asperity in meters
 % ...,'asperityLength',0.025    : Length of asperity in meters
 % ...,'shape', 'sine',          : shape of the asperity 
 %                                (one of: % 'sine','triangle','box','step',
@@ -83,7 +83,7 @@ if strcmp(profileType,'single_asperity')
            ones(1,numPts-startInd-numAsperityPts)*absoluteAsperityHeight];
     end
     
-elseif strcmp(profileType,'real_profile')
+% elseif strcmp(profileType,'real_profile')
     % to do
 end
     
@@ -154,12 +154,13 @@ end
         figure(numberOfRuns+2)
         newSubPlotHandle = subplot(numberOfRuns,1,n);
         copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
-        legend(newSubPlotHandle, sprintf('%s, h = %f, l = %f, A = %f',      ...
-                                         string(asperityTypeArray),      ...
-                                         absoluteAsperityHeightArray(n),    ...
-                                         absoluteAsperityLenghtArray(n),    ...
-                                         absoluteAsperityHeightArray(n)/absoluteAsperityLenghtArray(n)))
+        legend(newSubPlotHandle, sprintf('h = %f, l = %f, A = %f',      ...
+                                         string(p.shape),      ...
+                                         p.asperityLength(n),    ...
+                                         p.asperityHeight(n),    ...
+                                         p.asperityHeight/p.asperityLength))
         axis equal
+       
     end
 end
 
@@ -212,12 +213,12 @@ parse(p,input{:})
 p = p.Results;
 
 if p.numberOfRuns ~= 1 
-    if strcmp(p.plot, 'long plot')
+    if strcmp(p.plotOption, 'long plot')
         warning('if number of plot ~= 1, the long plot option is not possible')
-        p.plot = 'short';
+        p.plotOption = 'short';
     end
     
-    numEl = cellfun(@numel,{p.numberOfElements,p.aperityLenght,p.asperityHeight,p.faultLength});
+    numEl = cellfun(@numel,{p.numberOfElements,p.asperityLength,p.asperityHeight,p.faultLength});
     
     if ~any(numEl>1)
         warning('no variable is set to be more than one value, nothing to iterate')

@@ -386,7 +386,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     E                       = 3000;     % Young's Modulus MPa
     nu                      = 0.25;     % Poisson's ratio
-    T                       = 10;       % Tensile strength of the host rock (MPa) | 5-10
+    T                       = 5;       % Tensile strength of the host rock (MPa) | 5-10
     S_0                     = 25;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
     static_friction         = 0.6;      % static friction of crack elements
     dynamic_friction        = 0;        % dynamic friction of crack elements
@@ -397,7 +397,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     % boundary conditions
     
-    lithostatic_stress      = -80;
+    lithostatic_stress      = -60;
     shear_stress            = -40;
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
