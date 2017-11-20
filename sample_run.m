@@ -27,108 +27,34 @@ function sample_run(varargin)
 % * 'asperityLengh', [0.02,0.03, 0.04] - the numeric specifiers must be a
 % maximum and minimum values 
 
+%% parse the input in a structured way
+userInput = parse_user_input(varargin);
 
-p = parse_user_input(varargin);
-
-% name of the run 
-generalRunName = p.fileName;
-
-% make the desired profile
-
-numPts = p.numberOfElements;
-profileType =  p.profileType;
-
-numberOfRuns = p.numberOfRuns;
-
-for iRun = 1:numberOfRuns
-    
-if strcmp(profileType,'single_asperity')
-    %  query values for this iteration
-    asperityType            = p.shape;
-    absoluteAsperityLength  = p.asperityLength(iRun);
-    absoluteAsperityHeight  = p.asperityHeight(iRun);  
-    numPts                  = p.numberOfElements(iRun);
-    absoluteFaultLength     = p.faultLength(iRun);
-    
-    % determine point spacing
-    pointSpacing = absoluteFaultLength/numPts; % spacing of points in m
-    
-    % produce X-vector
-    X = (0:numPts-1)*pointSpacing;
-    
-    %
-    numAsperityPts = ceil(numPts*(absoluteAsperityLength/absoluteFaultLength));
-    startInd = floor(numPts/2-numAsperityPts/2);
-    
-    if strcmp(asperityType, 'sine') % Hann window
-        Y = [zeros(1,startInd), ...
-                tukeywin(numAsperityPts,1)'*absoluteAsperityHeight, ...
-                zeros(1,numPts-startInd-numAsperityPts)];
-    
-    elseif strcmp(asperityType, 'triangle') % bartlet window
-        Y = [zeros(1,startInd), ...
-            window(@bartlett, numAsperityPts)'*absoluteAsperityHeight, ...
-            zeros(1,numPts-startInd-numAsperityPts)];
-        
-    elseif strcmp(asperityType, 'box') % tuckyWin
-       Y = [zeros(1,startInd), ...
-                tukeywin(numAsperityPts,0)'*absoluteAsperityHeight, ...
-                zeros(1,numPts-startInd-numAsperityPts)];
-    
-    elseif strcmp(asperityType, 'step') % step
-       Y = [zeros(1,floor(numPts/2)), ...
-              ones(1,ceil(numPts/2))*absoluteAsperityHeight];
-    elseif strcmp(asperityType, 'jog') % diagonal step
-       Y = [zeros(1,startInd), absoluteAsperityHeight/numAsperityPts*(1:numAsperityPts), ...
-           ones(1,numPts-startInd-numAsperityPts)*absoluteAsperityHeight];
-    end
-    
-% elseif strcmp(profileType,'real_profile')
-    % to do
-end
-    
-% interpolate so that dislocation element size remains constant: 
-T           = linspace(0,1,numPts);     % make fractional-size array (point along the arc at wich points will be interpolated)
-[pt,~,~]    = interparc(T,X,Y);         % interpolate along arc
-
-% reassign to  X and Y for simplicity's sake
-X           = pt(:,1);                  
-Y           = pt(:,2);
+%% loop over iterations of fault geometry
+for iRun = 1:userInput.numberOfRuns
 
 % generate descriptive file name
-fileName = sprintf('%s_%s_%s_%s_run%i',generalRunName, profileType, asperityType, date, iRun);
-                
-% run the work flow
-tic
-growOutput = fric2d_workflow(fileName,X,Y,p.plotOption);
-runTime = toc;
-sprintf('run time was: %f seconds', runTime)
+fileName    = sprintf('%s_%s_%s_%s_run%i'       , ...
+                      userInput.fileName        , ...
+                      userInput.profileType     , ...
+                      userInput.shape           , ...
+                      date                      , ...
+                      iRun                      );
 
-% make plot of dHdx as a function of H0
-% -------------------------------------
+%% generate the profile of the fault
+[X,Y]       = make_profile(userInput,profileType,iRun);
 
+%% run the fric2D workflow
+growOutput  = fric2d_workflow(fileName,X,Y,userInput.plotOption);
+
+%% make plot of dHdx as a function of H0
 plotdHdxYN = 'no';
-if strcmp(plotdHdxYN,'yes')
-    
-    if iRun == 1 % intialize variables (for clarity and avoiding multiple if statements was put here)
-        Hf      = zeros(1,numberOfRuns);
-        H0      = zeros(1,numberOfRuns);
-    end
-    
-    Hf(iRun)    = getHfVal(plotdHdxYN,growOutput);    % plot the dH/dx as a function of initial height
-    H0(iRun)    = absoluteAsperityHeight;
-    
-    if iRun == numberOfRuns
-        dHdx = H0-Hf;
-        figure
-        loglog(dHdx,H0,'.-')
-    end
-end
+plot_dHdx(plotdHdxYN, userInput.numberOfRuns, growOutput, absoluteAsperityHeight);
 
 end %for
 
-
-plot_aggregate(numberOfRuns)    % plot all the failure geometries in a single plot (see subfunction for more)
+%% plot all the failure geometries in a single plot (see subfunction for more)
+plot_aggregate(userInput.numberOfRuns)   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% -------------------------- Nested function -----------------------------
@@ -155,10 +81,10 @@ end
         newSubPlotHandle = subplot(numberOfRuns,1,n);
         copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
         legend(newSubPlotHandle, sprintf('h = %f, l = %f, A = %f',      ...
-                                         string(p.shape),      ...
-                                         p.asperityLength(n),    ...
-                                         p.asperityHeight(n),    ...
-                                         p.asperityHeight/p.asperityLength))
+                                         string(userInput.shape),      ...
+                                         userInput.asperityLength(n),    ...
+                                         userInput.asperityHeight(n),    ...
+                                         userInput.asperityHeight/userInput.asperityLength))
         axis equal
        
     end
@@ -248,7 +174,107 @@ end
                 error('Sample_run cannot handle inputs of length > 2')
             end 
     end
+end        
+
+function [X,Y] = make_profile(p,profileType,iRun)
+
+if strcmp(profileType,'single_asperity')
+    %  query values for this iteration
+    asperityType            = p.shape;
+    absoluteAsperityLength  = p.asperityLength(iRun);
+    absoluteAsperityHeight  = p.asperityHeight(iRun);  
+    numPts                  = p.numberOfElements(iRun);
+    absoluteFaultLength     = p.faultLength(iRun);
+    
+    % determine point spacing
+    pointSpacing = absoluteFaultLength/numPts; % spacing of points in m
+    
+    % produce X-vector
+    x = (0:numPts-1)*pointSpacing;
+    
+    %
+    numAsperityPts = ceil(numPts*(absoluteAsperityLength/absoluteFaultLength));
+    startInd = floor(numPts/2-numAsperityPts/2);
+    
+    if strcmp(asperityType, 'sine') % Hann window
+        y = [zeros(1,startInd), ...
+                tukeywin(numAsperityPts,1)'*absoluteAsperityHeight, ...
+                zeros(1,numPts-startInd-numAsperityPts)];
+    
+    elseif strcmp(asperityType, 'triangle') % bartlet window
+        y = [zeros(1,startInd), ...
+            window(@bartlett, numAsperityPts)'*absoluteAsperityHeight, ...
+            zeros(1,numPts-startInd-numAsperityPts)];
+        
+    elseif strcmp(asperityType, 'box') % tuckyWin
+       y = [zeros(1,startInd), ...
+                tukeywin(numAsperityPts,0)'*absoluteAsperityHeight, ...
+                zeros(1,numPts-startInd-numAsperityPts)];
+    
+    elseif strcmp(asperityType, 'step') % step
+       y = [zeros(1,floor(numPts/2)), ...
+              ones(1,ceil(numPts/2))*absoluteAsperityHeight];
+    elseif strcmp(asperityType, 'jog') % diagonal step
+       y = [zeros(1,startInd), absoluteAsperityHeight/numAsperityPts*(1:numAsperityPts), ...
+           ones(1,numPts-startInd-numAsperityPts)*absoluteAsperityHeight];
+    end
+    
+% elseif strcmp(profileType,'real_profile')
+    % to do
+end % strcmp(profileType,'single_asperity')
+    
+% interpolate so that dislocation element size remains constant: 
+T           = linspace(0,1,numPts);     % make fractional-size array (point along the arc at wich points will be interpolated)
+[pt,~,~]    = interparc(T,x,y);         % interpolate along arc
+
+% reassign to  X and Y for simplicity's sake
+X           = pt(:,1);                  
+Y           = pt(:,2);
+
 end
+function plot_dHdx(yesOrNo, numberOfRuns, growOutput, absoluteAsperityHeight)
+
+if strcmp(yesOrNo,'yes')
+    
+    if iRun == 1 % intialize variables (for clarity and avoiding multiple if statements was put here)
+        Hf      = zeros(1,numberOfRuns);
+        H0      = zeros(1,numberOfRuns);
+    end
+    
+    Hf(iRun)    = getHfVal(plotdHdxYN,growOutput);    % plot the dH/dx as a function of initial height
+    H0(iRun)    = absoluteAsperityHeight;
+    
+    if iRun == numberOfRuns
+        dHdx = H0-Hf;
+        figure
+        loglog(dHdx,H0,'.-')
+    end
+    
+end
+
+end
+    function DHDX = getHfVal(plotYN, GROWOutputStruct)
+% compute the value of the Height change
+
+% ONLY WORKS FOR SINGLE ASPERITY, SINGLE CRACK CASE!
+
+% input:
+% plotYN: 'yes' or 'no'- whether or not to use the function
+% growOuputStruct: output produced by fric2d_workflow
+
+if strcmp(plotYN, 'no')
+    return
+elseif ~strcmp(plotYN, 'yes')
+    error('Error using plot_dHdxVsH, input must be ''yes'' or ''no''')
+end
+
+yBeg = GROWOutputStruct.segments(1).ybeg;
+yEnd = GROWOutputStruct.segments(1).yend;
+yMax = max(max(abs([yBeg;yEnd])));
+
+DHDX = yMax;
+end
+
 
 %% interpolate curve with constant element length (Author: John D'Errico - fileExchange)
 function [pt,dudt,fofthandle] = interparc(t,px,py,varargin)
@@ -812,25 +838,4 @@ end
 
 end % function validstring
 
-function DHDX = getHfVal(plotYN, GROWOutputStruct)
-% compute the value of the Height change
-
-% ONLY WORKS FOR SINGLE ASPERITY, SINGLE CRACK CASE!
-
-% input:
-% plotYN: 'yes' or 'no'- whether or not to use the function
-% growOuputStruct: output produced by fric2d_workflow
-
-if strcmp(plotYN, 'no')
-    return
-elseif ~strcmp(plotYN, 'yes')
-    error('Error using plot_dHdxVsH, input must be ''yes'' or ''no''')
-end
-
-yBeg = GROWOutputStruct.segments(1).ybeg;
-yEnd = GROWOutputStruct.segments(1).yend;
-yMax = max(max(abs([yBeg;yEnd])));
-
-DHDX = yMax;
-end
 
