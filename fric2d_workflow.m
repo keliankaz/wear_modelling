@@ -45,7 +45,7 @@ function GROWOutputStruct = fric2d_workflow(fileName,X,Y,varargin)
 [X, Y,plotOption] = checkinput(fileName, X,Y,varargin, nargin);
 
 % *check Directory*
-check_directory(GROWInputParameters)
+check_directory(GROWInputParameters);
 
 %% 1) make input file
 [~, newX] = makeinputfile(fileName,X,Y,inputParameters);
@@ -78,12 +78,16 @@ GROWOutputStruct = extractGROWoutput(crackLocations, GROWInputParameters.growFil
 end
 
 %% 7)  graphically show entire output
-plotoutputinfo
+plotoutputinfo;
 
 %% 8) organize files
 % create directory where all files will be stored
 
-organizefiles
+organizefiles;
+
+%% 9) check model - issue potential warnings:
+
+checkmodel(X,Y,inputParameters, outputStruct, GROWOutputStruct);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------- embeded functions ------------------------------
@@ -112,13 +116,13 @@ organizefiles
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
-fric2dFig = figure;
+figure
 
-longPlot = plotOption;
+longPlotOn        = strcmp(plotOption,'long plot');
 numPlots        = 4;
 subPlotCount    = 1;
 
-if strcmp(longPlot, 'long')
+if longPlotOn
 subplot(numPlots, 1, subPlotCount)
 end
 subPlotCount = subPlotCount+1;
@@ -193,7 +197,7 @@ axis equal
 xlabel('x (m)')
 ylabel('y (m)')
 
-if strcmp(longPlot, 'on')
+if longPlotOn
 
 % b) displacmement (shear, normal)
 subplot(numPlots, 1, subPlotCount) 
@@ -386,7 +390,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     E                       = 3000;     % Young's Modulus MPa
     nu                      = 0.25;     % Poisson's ratio
-    T                       = 5;       % Tensile strength of the host rock (MPa) | 5-10
+    T                       = 10;       % Tensile strength of the host rock (MPa) | 5-10
     S_0                     = 25;        % Shear strength of the host rock (MPa) | 25-60 (realistic amounts)
     static_friction         = 0.6;      % static friction of crack elements
     dynamic_friction        = 0;        % dynamic friction of crack elements
@@ -397,7 +401,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     
     % boundary conditions
     
-    lithostatic_stress      = -60;
+    lithostatic_stress      = -40; 
     shear_stress            = -40;
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -431,9 +435,9 @@ function [inputParameters, GROWInputParameters] = userInput()
    
     % this will be part of the command to run GROW (Must be digits - no
     % decimal points)
-    GROWInputParameters.angleResolution         = 20;
-    GROWInputParameters.startAngle              = 1;
-    GROWInputParameters.endAngle                = 359;
+    GROWInputParameters.angleResolution         = 15;
+    GROWInputParameters.startAngle              = 90;
+    GROWInputParameters.endAngle                = 270;
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STORING INPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -465,7 +469,7 @@ function [inputParameters, GROWInputParameters] = userInput()
     GROWInputParameters.fault_flaw = fault_flaw;
     
     % software:
-    GROWInputParameters.GROW_perl_fileName = 'GROW_AUG_2017.pl';
+    GROWInputParameters.GROW_perl_fileName = 'GROW_OCT_2017.pl';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -599,7 +603,12 @@ fprintf(fid, 'fault segment_0 yes no no\n');
 fclose(fid);
 
 % concatenate to the input file
-command = sprintf('cat %s %s %s %s > %s', input_section_fileName, fault_header_fileName, profileName, 'end_bits.txt', [fileName, '.in']);
+command = sprintf('cat %s %s %s %s > %s',   ...
+                  input_section_fileName,   ...
+                  fault_header_fileName,    ...
+                  profileName,              ...
+                  'end_bits.txt',           ...
+                  [fileName, '.in']         );
 system(command);
 
 % more options...
@@ -647,7 +656,7 @@ if max(abs(Y))>boxSize(2)*0.1
     warning('Profile topography is large, consider choosing a larger aspect ratio for the box by changing the vatiable ''boxAspectRatio'' ');
 end
 
-% roubnd to increments of the length of elements
+% round to increments of the length of elements
 
 newX = X - min(X) + boxSize(1)/2 - RX/2; % shift X to be centered in the observation box
 
@@ -676,7 +685,7 @@ end
     tempFileName = 'end_bits.txt';
     fileID = fopen(tempFileName,'w');
     fprintf(fileID,'%s\r\n',intro{:});
-    fclose(fileID)
+    fclose(fileID);
     % find ends of the fault
     X1      = X(1);
     Y1      = Y(1);
@@ -1348,7 +1357,22 @@ end
 
 %% 8) Organize files (function is located in embeded function section)
 
-%% 9) generate output (function is located in embeded function section)
+%% 9) check model - issue potential warnings
+
+function checkmodel(X,Y,inputParameters, outputStruct, GROWOutputStruct)
+
+% displacement limitations
+elementLength = sqrt((X(2)-X(1))^2 + (Y(2)-Y(1))^2);
+messageOut = sprintf('Element length: %f, Max displacement: %f', ...
+                     elementLength, ...
+                     max(abs(outputStruct.faultStress.DS)));
+disp(messageOut)
+
+   if any(abs(outputStruct.faultStress.DS) > 0.5*elementLength)
+        warning('displacement on individual elements is too large, consider making elements longer or reducing stresses')
+   end
+   
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ---------------------- handy tools -------------------------------------

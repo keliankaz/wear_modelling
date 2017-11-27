@@ -7,7 +7,7 @@ function sample_run(varargin)
 % ...,'asperityHeight',0.002    : Height of asperity in meters
 % ...,'asperityLength',0.025    : Length of asperity in meters
 % ...,'shape', 'sine',          : shape of the asperity 
-%                                (one of: % 'sine','triangle','box','step',
+%                                (one of: % absoluteAsperityHeight'sine','triangle','box','step',
 %                                'jog','real profile')
 
 % Numeric inputs be iteratively changed by choosing the minimum and maximum
@@ -42,25 +42,25 @@ fileName    = sprintf('%s_%s_%s_%s_run%i'       , ...
                       iRun                      );
 
 %% generate the profile of the fault
-[X,Y]       = make_profile(userInput,profileType,iRun);
+[X,Y]       = make_profile(userInput, userInput.profileType ,iRun);
 
 %% run the fric2D workflow
 growOutput  = fric2d_workflow(fileName,X,Y,userInput.plotOption);
 
 %% make plot of dHdx as a function of H0
 plotdHdxYN = 'no';
-plot_dHdx(plotdHdxYN, userInput.numberOfRuns, growOutput, absoluteAsperityHeight);
+plot_dHdx(plotdHdxYN, userInput.numberOfRuns, growOutput, userInput.asperityHeight(iRun));
 
 end %for
 
 %% plot all the failure geometries in a single plot (see subfunction for more)
-plot_aggregate(userInput.numberOfRuns)   
+plot_aggregate(userInput)   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% -------------------------- Nested function -----------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function plot_aggregate(numberOfRuns)
+function plot_aggregate(userInput)
 % plot the figures in one single plot composed of subplots (this is
 % somewhat weird given that we are copying figures that have aleready been
 % produced
@@ -70,21 +70,25 @@ function plot_aggregate(numberOfRuns)
 %of runs is 1
 
 % return if numberOfRuns ==1
-if numberOfRuns ==1
+if userInput.numberOfRuns ==1
     return
 end
 
  figure
-    for n = 1:numberOfRuns
-        figureHandle = figure(n);
-        figure(numberOfRuns+2)
-        newSubPlotHandle = subplot(numberOfRuns,1,n);
+    for n = 1:userInput.numberOfRuns
+        
+        figureHandle        = figure(n);
+        figure(userInput.numberOfRuns+2)
+        
+        newSubPlotHandle    = subplot(userInput.numberOfRuns,1,n);
+        
         copyobj(allchild(get(figureHandle,'CurrentAxes')),newSubPlotHandle);
-        legend(newSubPlotHandle, sprintf('h = %f, l = %f, A = %f',      ...
+        
+        legend(newSubPlotHandle, sprintf('%s, h = %f, l = %f, A = %f',      ...
                                          string(userInput.shape),      ...
                                          userInput.asperityLength(n),    ...
                                          userInput.asperityHeight(n),    ...
-                                         userInput.asperityHeight/userInput.asperityLength))
+                                         userInput.asperityHeight/userInput.asperityLength));
         axis equal
        
     end
@@ -134,7 +138,7 @@ addParameter(p,'faultLength'       , defaultFaultLength,    validationFcn);
 
 addParameter(p,'plotOption',               defaultPlotOption, @(x) any(validatestring(x,expectedPlotOptions)));
 
-parse(p,input{:})
+parse(p,input{:});
 
 p = p.Results;
 

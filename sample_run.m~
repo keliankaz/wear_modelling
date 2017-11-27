@@ -54,13 +54,13 @@ plot_dHdx(plotdHdxYN, userInput.numberOfRuns, growOutput, absoluteAsperityHeight
 end %for
 
 %% plot all the failure geometries in a single plot (see subfunction for more)
-plot_aggregate(userInput.numberOfRuns)   
+plot_aggregate(userInput)   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% -------------------------- Nested function -----------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function plot_aggregate(numberOfRuns)
+function plot_aggregate(userInput)
 % plot the figures in one single plot composed of subplots (this is
 % somewhat weird given that we are copying figures that have aleready been
 % produced
@@ -70,7 +70,7 @@ function plot_aggregate(numberOfRuns)
 %of runs is 1
 
 % return if numberOfRuns ==1
-if numberOfRuns ==1
+if userInput.numberOfRuns ==1
     return
 end
 
@@ -174,7 +174,8 @@ end
                 error('Sample_run cannot handle inputs of length > 2')
             end 
     end
-end             
+end        
+
 function [X,Y] = make_profile(p,profileType,iRun)
 
 if strcmp(profileType,'single_asperity')
